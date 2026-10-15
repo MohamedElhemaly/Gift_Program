@@ -141,9 +141,6 @@ export default function ExcelUploadZone({ onClose }) {
         setProgressStatus(`اكتملت المزامنة بنجاح! تم حفظ وتحديث ${mergedList.length} طبيب في قاعدة البيانات.`);
         setProgressSubText('Database sync completed successfully.');
 
-        // Final success notification ONLY (no flickering during batch)
-        toast.success(`تم استيراد وحفظ ${mergedList.length} طبيب بنجاح في قاعدة البيانات!`);
-
         // Invalidate queries to ensure all tabs have fresh data
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
 
@@ -206,8 +203,6 @@ export default function ExcelUploadZone({ onClose }) {
         setProgressPercent(100);
         setProgressStatus(`تم تحديث إحصائيات ${result.count} طبيب بنجاح في قاعدة البيانات!`);
         setProgressSubText('Statistics updated successfully.');
-
-        toast.success(`تم تحديث حالات ${result.count} طبيب بنجاح!`);
 
         setTimeout(() => {
           setIsProcessing(false);

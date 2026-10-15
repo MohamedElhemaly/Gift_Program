@@ -339,15 +339,9 @@ export default function ControlPanel({ onPrint }) {
         )}
       </div>
 
-      {/* تنبيه الحالة إن وجد */}
-      {statusMessage && (
-        <div
-          className={`font-bold p-3 rounded-lg text-xs border ${
-            statusMessage.isError
-              ? 'bg-[#f8d7da] text-[#721c24] border-[#f5c6cb]'
-              : 'bg-[#d4edda] text-[#155724] border-[#c3e6cb]'
-          }`}
-        >
+      {/* تنبيه الأخطاء إن وجدت فقط (تحديثات السيرفر صامتة تماماً وبدون أي لافتات خضراء) */}
+      {statusMessage && statusMessage.isError && (
+        <div className="font-bold p-3 rounded-lg text-xs border bg-[#f8d7da] text-[#721c24] border-[#f5c6cb]">
           {statusMessage.text}
         </div>
       )}

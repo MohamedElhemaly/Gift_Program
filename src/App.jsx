@@ -37,19 +37,18 @@ export default function App() {
     initAuth();
   }, [initAuth]);
 
-  // Real-time synchronization via TanStack Query invalidation
+  // Real-time synchronization via TanStack Query invalidation (SILENT SYNC - NO BANNERS/POPUPS)
   useEffect(() => {
     if (user && isSupabaseConfigured && !isDemoMode) {
       const unsubscribe = doctorService.subscribeToChanges(({ table, payload }) => {
-        console.log(`Real-time update on ${table}:`, payload);
-        setStatus('تم استلام تحديث جديد من السيرفر...');
+        // Silently invalidate doctors cache so UI updates seamlessly without annoying banners or popups
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
       });
       return () => {
         unsubscribe();
       };
     }
-  }, [user, isDemoMode, setStatus]);
+  }, [user, isDemoMode]);
 
   const totalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 

@@ -51,38 +51,12 @@ export const doctorService = {
     }
 
     try {
-      let { data, error } = await supabase
-        .from('doctors')
-        .select(`
-          id,
-          doc_code,
-          name,
-          specialty,
-          address,
-          mobile,
-          home_tel,
-          is_inactive,
-          is_moved,
-          moved_from,
-          merged_codes,
-          display_order,
-          location:locations (
-            id,
-            governorate,
-            city,
-            region
-          ),
-          statistics (
-            old_stats,
-            new_stats,
-            last_updated
-          )
-        `)
-        .order('doc_code', { ascending: true });
+      const PAGE_SIZE = 1000;
+      let allRecords = [];
+      let from = 0;
 
-      if (error && error.message && (error.message.includes('is_moved') || error.message.includes('column'))) {
-        console.warn('Extended columns not present in doctors table; fetching base columns...');
-        const baseRes = await supabase
+      while (true) {
+        let { data, error } = await supabase
           .from('doctors')
           .select(`
             id,
@@ -93,6 +67,10 @@ export const doctorService = {
             mobile,
             home_tel,
             is_inactive,
+            is_moved,
+            moved_from,
+            merged_codes,
+            display_order,
             location:locations (
               id,
               governorate,
@@ -105,16 +83,50 @@ export const doctorService = {
               last_updated
             )
           `)
-          .order('doc_code', { ascending: true });
+          .order('doc_code', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-        if (baseRes.error) throw baseRes.error;
-        data = baseRes.data;
-      } else if (error) {
-        throw error;
+        if (error) {
+          console.warn('Paginated fetch warning:', error.message);
+          // Fallback to base columns if extended columns missing
+          const baseRes = await supabase
+            .from('doctors')
+            .select(`
+              id,
+              doc_code,
+              name,
+              specialty,
+              address,
+              mobile,
+              home_tel,
+              is_inactive,
+              location:locations (
+                id,
+                governorate,
+                city,
+                region
+              ),
+              statistics (
+                old_stats,
+                new_stats,
+                last_updated
+              )
+            `)
+            .order('doc_code', { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (baseRes.error) throw baseRes.error;
+          data = baseRes.data;
+        }
+
+        if (!data || data.length === 0) break;
+        allRecords.push(...data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
 
       // Transform joined data to flat doctor structure matching the original UI model
-      const transformed = (data || []).map((doc) => ({
+      const transformed = allRecords.map((doc) => ({
         id: doc.id,
         doc_code: doc.doc_code || '',
         name: doc.name || '',
@@ -133,6 +145,9 @@ export const doctorService = {
         old_stats: doc.statistics?.[0]?.old_stats ?? doc.statistics?.old_stats ?? '',
         new_stats: doc.statistics?.[0]?.new_stats ?? doc.statistics?.new_stats ?? '',
       }));
+
+      // Cache locally for instant offline/reload access
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(transformed));
 
       return transformed;
     } catch (err) {

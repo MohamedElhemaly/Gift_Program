@@ -154,7 +154,24 @@ export const useDoctorStore = create((set, get) => ({
    * Load data from database or cache
    */
   loadFromDB: async () => {
-    set({ loading: true });
+    // 1. Instant Cache Load (Stale-While-Revalidate)
+    const cached = localStorage.getItem('gift_program_doctors_data');
+    let hasLoadedCache = false;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          set({ rawDoctors: parsed, loading: false });
+          get().rebuildData(parsed);
+          hasLoadedCache = true;
+        }
+      } catch (e) {}
+    }
+    
+    if (!hasLoadedCache) {
+      set({ loading: true });
+    }
+
     try {
       const docs = await doctorService.fetchDoctors();
       set({ rawDoctors: docs, loading: false });
@@ -164,8 +181,10 @@ export const useDoctorStore = create((set, get) => ({
       set({ locations: locs });
     } catch (err) {
       console.error('Failed to load doctors:', err);
-      get().setStatus('حدث خطأ أثناء تحميل البيانات: ' + err.message, true);
-      set({ loading: false });
+      if (!hasLoadedCache) {
+        get().setStatus('حدث خطأ أثناء تحميل البيانات: ' + err.message, true);
+        set({ loading: false });
+      }
     }
   },
 

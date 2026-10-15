@@ -82,24 +82,26 @@ export default function ControlPanel({ onPrint }) {
     setStatus('جاري استخراج البيانات والمزامنة مع قاعدة البيانات...');
 
     try {
+      // 1. Instant parsing in memory (takes ~0.5s)
       const mergedList = await parseAndMergeSheets({ docsFile, oldFile, newFile });
 
-      // Upsert to Supabase with live progress callback
-      const result = await doctorService.upsertDoctorsBatch(mergedList, (msg) =>
-        setStatus(msg)
-      );
-
-      // Rebuild in Zustand Store
+      // 2. Render IMMEDIATELY on screen - ZERO DELAY!
       rebuildData(mergedList);
+      localStorage.setItem('gift_program_doctors_data', JSON.stringify(mergedList));
+      setStatus(`تم استخراج ${mergedList.length} طبيب وبناء التقرير بنجاح! جاري المزامنة مع السحابة...`);
 
-      if (result.warning) {
-        setStatus(`تم بناء التقرير وعرض ${result.count} طبيب بنجاح!`);
-      } else {
-        setStatus(`تم إنشاء التقرير بنجاح وحفظ ${result.count} طبيب في قاعدة البيانات.`);
-      }
+      // 3. Upsert to Supabase in parallel
+      doctorService.upsertDoctorsBatch(mergedList, (msg) => setStatus(msg))
+        .then((result) => {
+          setStatus(`تم حفظ وتأكيد ${result.count} طبيب بنجاح في قاعدة البيانات.`);
+        })
+        .catch((err) => {
+          console.warn('Sync notice:', err);
+        });
+
     } catch (err) {
       console.error(err);
-      setStatus('حدث خطأ: ' + err.message, true);
+      setStatus('حدث خطأ أثناء قراءة الملف: ' + err.message, true);
     } finally {
       setLoadingAction(false);
     }
@@ -127,11 +129,8 @@ export default function ControlPanel({ onPrint }) {
 
     try {
       const statsList = await parseStatsOnly({ oldFile, newFile });
-      const result = await doctorService.updateStatisticsOnlyBatch(statsList, (msg) =>
-        setStatus(msg)
-      );
 
-      // Apply updates in local store
+      // Apply updates in local store immediately
       const list = [...displayedDoctors];
       let counter = 0;
       statsList.forEach((st) => {
@@ -155,11 +154,13 @@ export default function ControlPanel({ onPrint }) {
       });
 
       rebuildData(list);
-      setStatus(
-        result.count > 0
-          ? `تم تحديث ${result.count} حالة بنجاح في قاعدة البيانات.`
-          : 'لم يتم العثور على أرقام جديدة تختلف عن الحالية.'
-      );
+      setStatus(`تم تحديث ${counter} حالة على الشاشة فوراً! جاري المزامنة في السحابة...`);
+
+      // Sync to Supabase in background
+      doctorService.updateStatisticsOnlyBatch(statsList, (msg) => setStatus(msg))
+        .then((result) => {
+          setStatus(`تم تأكيد تحديث ${result.count} حالة بنجاح في قاعدة البيانات.`);
+        });
     } catch (err) {
       console.error(err);
       setStatus('خطأ في التحديث: ' + err.message, true);

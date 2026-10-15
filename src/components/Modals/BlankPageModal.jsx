@@ -15,6 +15,15 @@ export default function BlankPageModal({ isOpen, onClose }) {
     onClose();
   };
 
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'Enter') handleConfirm();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gvr, city, region, onClose]);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div

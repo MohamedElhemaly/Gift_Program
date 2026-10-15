@@ -22,8 +22,14 @@ export default function CombineModal() {
       setInputCode('');
       setErrorMsg('');
       setTimeout(() => inputRef.current?.focus(), 100);
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') closeCombineModal();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isCombineModalOpen]);
+  }, [isCombineModalOpen, closeCombineModal]);
 
   if (!isCombineModalOpen || activeModalIndex === -1) return null;
 

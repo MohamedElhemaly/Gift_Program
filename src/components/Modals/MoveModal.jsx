@@ -24,8 +24,14 @@ export default function MoveModal() {
       setNewGvr('');
       setNewCity('');
       setNewRegion('');
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') closeMoveModal();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isMoveModalOpen]);
+  }, [isMoveModalOpen, closeMoveModal]);
 
   // Extract unique locations from current data
   const uniqueLocations = useMemo(() => {

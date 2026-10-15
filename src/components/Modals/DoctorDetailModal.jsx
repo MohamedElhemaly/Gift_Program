@@ -38,6 +38,16 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   const toggleInactiveMutation = useToggleInactiveMutation();
   const deleteDoctorMutation = useDeleteDoctorMutation();
 
+  React.useEffect(() => {
+    if (isOpen) {
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') onClose();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen || index === -1 || !displayedDoctors[index]) return null;
 
   const doc = displayedDoctors[index];

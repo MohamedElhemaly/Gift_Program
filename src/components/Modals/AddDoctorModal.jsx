@@ -51,8 +51,14 @@ export default function AddDoctorModal() {
         old_stats: '0',
         new_stats: '0',
       });
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') closeAddDoctorModal();
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isAddDoctorModalOpen, addDoctorInitialData, displayedDoctors]);
+  }, [isAddDoctorModalOpen, addDoctorInitialData, displayedDoctors, closeAddDoctorModal]);
 
   if (!isAddDoctorModalOpen) return null;
 

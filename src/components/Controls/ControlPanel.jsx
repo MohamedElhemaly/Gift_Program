@@ -46,6 +46,20 @@ export default function ControlPanel({ onPrint }) {
   const [pageRange, setPageRange] = useState('الكل');
   const [isBlankPageModalOpen, setIsBlankPageModalOpen] = useState(false);
   const [isExcelOpen, setIsExcelOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState(filters?.searchTerm || '');
+
+  useEffect(() => {
+    setLocalSearch(filters?.searchTerm || '');
+  }, [filters?.searchTerm]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== (filters?.searchTerm || '')) {
+        setFilter('searchTerm', localSearch);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [localSearch]);
 
   // File Input Refs
   const docsFileRef = useRef(null);
@@ -370,14 +384,17 @@ export default function ControlPanel({ onPrint }) {
               <input
                 type="text"
                 placeholder="ابحث بالاسم أو الكود..."
-                value={filters?.searchTerm || ''}
-                onChange={(e) => setFilter('searchTerm', e.target.value)}
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
                 className="w-full text-xs p-2 pl-7 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
-              {filters?.searchTerm && (
+              {localSearch && (
                 <button
                   type="button"
-                  onClick={() => setFilter('searchTerm', '')}
+                  onClick={() => {
+                    setLocalSearch('');
+                    setFilter('searchTerm', '');
+                  }}
                   className="absolute left-2 top-2.5 text-gray-400 hover:text-gray-600"
                 >
                   <X className="w-3.5 h-3.5" />

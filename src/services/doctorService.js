@@ -220,22 +220,45 @@ export const doctorService = {
           onProgress(`جاري حفظ بيانات الأطباء (${currentCount} من ${doctorsList.length})...`);
         }
 
+        // Query existing doctors in this chunk to preserve manual location/moves/merges
+        const chunkCodes = chunk.map((d) => String(d.doc_code).trim());
+        let existingMap = new Map();
+        try {
+          const { data: existingRecords } = await supabase
+            .from('doctors')
+            .select('doc_code, location_id, is_moved, moved_from, merged_codes, is_inactive')
+            .in('doc_code', chunkCodes);
+          if (existingRecords) {
+            existingRecords.forEach((r) => existingMap.set(r.doc_code, r));
+          }
+        } catch (exErr) {
+          console.warn('Could not check existing doctors:', exErr);
+        }
+
         const buildRecords = (withExtended) => chunk.map((d) => {
+          const code = String(d.doc_code).trim();
+          const existing = existingMap.get(code);
           const key = `${(d.pageGvr || '').trim()}:::${(d.pageCity || '').trim()}:::${(d.pageRegion || '').trim()}`;
+          
+          // If doctor already exists and was moved manually, preserve their location
+          const finalLocationId = (existing && existing.is_moved && existing.location_id) 
+            ? existing.location_id 
+            : (locationMap.get(key) || null);
+
           const rec = {
-            doc_code: String(d.doc_code).trim(),
+            doc_code: code,
             name: d.name || '',
             specialty: d.specialty || '',
             address: d.address || '',
             mobile: d.mobile || '',
             home_tel: d.home_tel || '',
-            is_inactive: Boolean(d.is_inactive),
-            location_id: locationMap.get(key) || null,
+            is_inactive: existing ? Boolean(existing.is_inactive) : Boolean(d.is_inactive),
+            location_id: finalLocationId,
           };
           if (withExtended) {
-            rec.is_moved = Boolean(d.is_moved);
-            rec.moved_from = d.moved_from || '';
-            rec.merged_codes = d.merged_codes || [];
+            rec.is_moved = existing ? Boolean(existing.is_moved) : Boolean(d.is_moved);
+            rec.moved_from = existing ? (existing.moved_from || '') : (d.moved_from || '');
+            rec.merged_codes = existing?.merged_codes?.length ? existing.merged_codes : (d.merged_codes || []);
           }
           return rec;
         });

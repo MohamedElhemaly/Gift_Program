@@ -26,13 +26,14 @@ export const useAuthStore = create((set, get) => ({
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error) throw error;
 
+      const savedAuth = localStorage.getItem('gift_program_auth_user');
+      const savedDemo = localStorage.getItem('gift_program_demo_user');
+      const fallbackUser = savedAuth ? JSON.parse(savedAuth) : (savedDemo ? JSON.parse(savedDemo) : null);
+
       set({
         session,
-        user: session?.user || {
-          id: 'admin-default',
-          email: 'admin@system.local',
-          user_metadata: { role: 'admin', full_name: 'مدير النظام' },
-        },
+        user: session?.user || fallbackUser,
+        isDemoMode: Boolean(!session?.user && fallbackUser),
         loading: false,
       });
 
@@ -40,11 +41,7 @@ export const useAuthStore = create((set, get) => ({
       supabase.auth.onAuthStateChange((_event, currentSession) => {
         set({
           session: currentSession,
-          user: currentSession?.user || {
-            id: 'admin-default',
-            email: 'admin@system.local',
-            user_metadata: { role: 'admin', full_name: 'مدير النظام' },
-          },
+          user: currentSession?.user || get().user,
           loading: false,
         });
       });
@@ -81,6 +78,10 @@ export const useAuthStore = create((set, get) => ({
 
       if (error) throw error;
 
+      if (data.user) {
+        localStorage.setItem('gift_program_auth_user', JSON.stringify(data.user));
+      }
+
       set({
         user: data.user,
         session: data.session,
@@ -113,6 +114,9 @@ export const useAuthStore = create((set, get) => ({
       if (error) throw error;
 
       if (data.session) {
+        if (data.user) {
+          localStorage.setItem('gift_program_auth_user', JSON.stringify(data.user));
+        }
         set({
           user: data.user,
           session: data.session,
@@ -136,18 +140,20 @@ export const useAuthStore = create((set, get) => ({
 
   signOut: async () => {
     set({ loading: true });
+    localStorage.removeItem('gift_program_auth_user');
+    localStorage.removeItem('gift_program_demo_user');
+
     if (get().isDemoMode || !supabase) {
-      localStorage.removeItem('gift_program_demo_user');
       set({ user: null, session: null, isDemoMode: false, loading: false });
       return;
     }
 
     try {
       await supabase.auth.signOut();
-      set({ user: null, session: null, loading: false });
+      set({ user: null, session: null, isDemoMode: false, loading: false });
     } catch (err) {
       console.error('SignOut error:', err);
-      set({ error: err.message, loading: false });
+      set({ user: null, session: null, isDemoMode: false, error: err.message, loading: false });
     }
   },
 

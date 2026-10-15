@@ -3,7 +3,6 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import {
   useUpdateDoctorFieldMutation,
   useToggleInactiveMutation,
-  useDeleteDoctorMutation,
 } from '../../hooks/useDoctorQueries';
 import { cleanDoctorName, cleanGeneralText } from '../../services/doctorService';
 import {
@@ -13,7 +12,6 @@ import {
   GitMerge,
   UserX,
   UserCheck,
-  Trash2,
   Smartphone,
   Phone,
   MapPin,
@@ -31,13 +29,11 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
     openMoveModal,
     openCombineModal,
     toggleInactive,
-    deleteDoctor,
     clearDoctorSlot,
   } = useDoctorStore();
 
   const updateFieldMutation = useUpdateDoctorFieldMutation();
   const toggleInactiveMutation = useToggleInactiveMutation();
-  const deleteDoctorMutation = useDeleteDoctorMutation();
 
   React.useEffect(() => {
     if (isOpen) {
@@ -75,18 +71,6 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
     toggleInactive(index);
     if (doc.id || doc.doc_code) {
       toggleInactiveMutation.mutate(doc);
-    }
-  };
-
-  const handleDelete = () => {
-    const docName = cleanDoctorName(doc.name) || doc.name || doc.doc_code || 'هذا الطبيب';
-    if (!window.confirm(`هل أنت متأكد من حذف الطبيب: "${docName}" نهائياً من قاعدة البيانات؟`)) {
-      return;
-    }
-    onClose();
-    deleteDoctor(index);
-    if (doc.id || doc.doc_code) {
-      deleteDoctorMutation.mutate(doc);
     }
   };
 
@@ -181,18 +165,6 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
             >
               <span>تفريغ</span>
             </button>
-
-            {/* Delete Doctor */}
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs border border-rose-200 transition-colors"
-              title="حذف الطبيب نهائياً"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>حذف</span>
-            </button>
-
             {/* Minimize / Close Button */}
             <button
               type="button"

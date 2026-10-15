@@ -34,6 +34,9 @@ export function cleanGeneralText(val) {
     .trim();
 }
 
+export const isValidUuid = (val) =>
+  Boolean(val && typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
+
 export const doctorService = {
   /**
    * Log an event in the audit_logs table
@@ -468,12 +471,23 @@ export const doctorService = {
     }
 
     try {
+      let resolvedId = isValidUuid(id) ? id : null;
+      if (!resolvedId && docCode) {
+        const { data: dData } = await supabase
+          .from('doctors')
+          .select('id')
+          .eq('doc_code', String(docCode).trim())
+          .maybeSingle();
+        if (dData?.id) resolvedId = dData.id;
+      }
+
       if (field === 'old_stats' || field === 'new_stats') {
+        if (!resolvedId) return;
         const intVal = parseInt(value, 10) || 0;
         await supabase
           .from('statistics')
           .upsert({
-            doctor_id: id,
+            doctor_id: resolvedId,
             [field]: intVal,
             last_updated: new Date().toISOString(),
           }, { onConflict: 'doctor_id' });
@@ -481,26 +495,31 @@ export const doctorService = {
         await this.logAudit(
           'INLINE_EDIT',
           `تعديل إحصائية (${field}) للطبيب ${docCode} إلى: ${value}`,
-          { doctor_id: id, doc_code: docCode, field, value }
+          { doctor_id: resolvedId, doc_code: docCode, field, value }
         );
       } else {
-        let res = await supabase
-          .from('doctors')
-          .update({ [field]: value, updated_at: new Date().toISOString() })
-          .eq('id', id);
+        let query = supabase.from('doctors').update({ [field]: value, updated_at: new Date().toISOString() });
+        if (resolvedId) {
+          query = query.eq('id', resolvedId);
+        } else if (docCode) {
+          query = query.eq('doc_code', String(docCode).trim());
+        } else {
+          return;
+        }
 
+        let res = await query;
         if (res.error && res.error.message && res.error.message.includes('updated_at')) {
-          res = await supabase
-            .from('doctors')
-            .update({ [field]: value })
-            .eq('id', id);
+          let fallback = supabase.from('doctors').update({ [field]: value });
+          if (resolvedId) fallback = fallback.eq('id', resolvedId);
+          else fallback = fallback.eq('doc_code', String(docCode).trim());
+          res = await fallback;
         }
         if (res.error) throw res.error;
 
         await this.logAudit(
           'INLINE_EDIT',
           `تعديل حقل (${field}) للطبيب ${docCode} إلى: ${value}`,
-          { doctor_id: id, doc_code: docCode, field, value }
+          { doctor_id: resolvedId, doc_code: docCode, field, value }
         );
       }
     } catch (err) {
@@ -550,16 +569,23 @@ export const doctorService = {
         updated_at: new Date().toISOString(),
       };
 
-      let updateRes = await supabase
-        .from('doctors')
-        .update(updatePayload)
-        .eq('id', doctor.id);
+      const isDocUuid = isValidUuid(doctor.id);
+      let query = supabase.from('doctors').update(updatePayload);
+      if (isDocUuid) {
+        query = query.eq('id', doctor.id);
+      } else if (doctor.doc_code) {
+        query = query.eq('doc_code', String(doctor.doc_code).trim());
+      } else {
+        return { success: true, location_id: locData.id };
+      }
+
+      let updateRes = await query;
 
       if (updateRes.error && updateRes.error.message && (updateRes.error.message.includes('is_moved') || updateRes.error.message.includes('column'))) {
-        updateRes = await supabase
-          .from('doctors')
-          .update({ location_id: locData.id })
-          .eq('id', doctor.id);
+        let fallback = supabase.from('doctors').update({ location_id: locData.id });
+        if (isDocUuid) fallback = fallback.eq('id', doctor.id);
+        else fallback = fallback.eq('doc_code', String(doctor.doc_code).trim());
+        updateRes = await fallback;
       }
 
       if (updateRes.error) throw updateRes.error;
@@ -567,7 +593,7 @@ export const doctorService = {
       await this.logAudit(
         'MOVE',
         `تم نقل الطبيب ${doctor.name || doctor.doc_code} من (${oldLocStr}) إلى (${g} - ${c} - ${r})`,
-        { doctor_id: doctor.id, doc_code: doctor.doc_code, from: oldLocStr, to: `${g} - ${c} - ${r}` }
+        { doctor_id: isDocUuid ? doctor.id : null, doc_code: doctor.doc_code, from: oldLocStr, to: `${g} - ${c} - ${r}` }
       );
 
       return { success: true, location_id: locData.id };
@@ -629,7 +655,7 @@ export const doctorService = {
 
     if (!isSupabaseConfigured || !supabase) {
       const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-      const found = cached.find((d) => d.id === doctor.id || String(d.doc_code) === String(doctor.doc_code));
+      const found = cached.find((d) => (d.id && d.id === doctor.id) || (d.doc_code && String(d.doc_code) === String(doctor.doc_code)));
       if (found) {
         found.is_inactive = newState;
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cached));
@@ -637,20 +663,29 @@ export const doctorService = {
       return { success: true, is_inactive: newState };
     }
 
-    const { error } = await supabase
+    const isDocUuid = isValidUuid(doctor.id);
+    let query = supabase
       .from('doctors')
       .update({
         is_inactive: newState,
         updated_at: new Date().toISOString(),
-      })
-      .eq('id', doctor.id);
+      });
 
+    if (isDocUuid) {
+      query = query.eq('id', doctor.id);
+    } else if (doctor.doc_code) {
+      query = query.eq('doc_code', String(doctor.doc_code).trim());
+    } else {
+      return { success: true, is_inactive: newState };
+    }
+
+    const { error } = await query;
     if (error) throw error;
 
     await this.logAudit(
       'TOGGLE_INACTIVE',
       `تم ${newState ? 'إيقاف' : 'إعادة تفعيل'} الطبيب ${doctor.name || doctor.doc_code}`,
-      { doctor_id: doctor.id, doc_code: doctor.doc_code, is_inactive: newState }
+      { doctor_id: isDocUuid ? doctor.id : null, doc_code: doctor.doc_code, is_inactive: newState }
     );
 
     return { success: true, is_inactive: newState };

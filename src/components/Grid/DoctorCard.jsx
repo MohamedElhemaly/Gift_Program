@@ -3,7 +3,6 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import {
   useUpdateDoctorFieldMutation,
   useToggleInactiveMutation,
-  useDeleteDoctorMutation,
 } from '../../hooks/useDoctorQueries';
 import { cleanDoctorName, cleanGeneralText } from '../../services/doctorService';
 import {
@@ -12,7 +11,6 @@ import {
   GitMerge,
   UserX,
   UserCheck,
-  Trash2,
   Plus,
   Smartphone,
   Phone,
@@ -30,14 +28,12 @@ function DoctorCard({ doc, index }) {
     openCombineModal,
     toggleInactive,
     openMaximizeModal,
-    deleteDoctor,
     openAddDoctorModal,
     showEmptySlotsOnScreen,
   } = useDoctorStore();
 
   const updateFieldMutation = useUpdateDoctorFieldMutation();
   const toggleInactiveMutation = useToggleInactiveMutation();
-  const deleteDoctorMutation = useDeleteDoctorMutation();
 
   const handleBlur = (field, e) => {
     const val = e.currentTarget.innerText.trim();
@@ -62,17 +58,6 @@ function DoctorCard({ doc, index }) {
     toggleInactive(index);
     if (doc.id || doc.doc_code) {
       toggleInactiveMutation.mutate(doc);
-    }
-  };
-
-  const handleDelete = () => {
-    const docName = doc.name || doc.doc_code || 'هذا الطبيب';
-    if (!window.confirm(`هل أنت متأكد من حذف الطبيب: "${docName}" نهائياً من قاعدة البيانات؟`)) {
-      return;
-    }
-    deleteDoctor(index);
-    if (doc.id || doc.doc_code) {
-      deleteDoctorMutation.mutate(doc);
     }
   };
 
@@ -184,15 +169,6 @@ function DoctorCard({ doc, index }) {
                   ) : (
                     <UserX className="w-3.5 h-3.5" />
                   )}
-                </button>
-
-                <button
-                  type="button"
-                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                  onClick={handleDelete}
-                  title="حذف هذا الطبيب نهائياً"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

@@ -40,6 +40,7 @@ export default function ControlPanel({ onPrint }) {
     toggleShowEmptySlots,
     distributionMode,
     setDistributionMode,
+    openPrintModal,
   } = useDoctorStore();
 
   const [pageRange, setPageRange] = useState('الكل');
@@ -368,24 +369,24 @@ export default function ControlPanel({ onPrint }) {
           </button>
         </div>
 
-        {/* خيارات الطباعة */}
+        {/* خيارات الطباعة المتقدمة والمزامنة الفورية */}
         {hasData && (
-          <div className="flex items-center gap-2 bg-slate-50 p-1.5 px-3 rounded-xl border border-slate-200">
-            <label className="font-bold text-gray-700 text-xs">الصفحات:</label>
-            <input
-              type="text"
-              value={pageRange}
-              onChange={(e) => setPageRange(e.target.value)}
-              placeholder="مثال: 1-3 أو الكل"
-              className="p-1.5 border border-slate-300 rounded text-center font-bold text-xs w-28 bg-white focus:outline-none focus:border-green-500"
-            />
+          <div className="flex items-center gap-2.5 bg-emerald-50/70 p-1.5 px-3 rounded-xl border border-emerald-200 flex-wrap">
+            <div className="text-[11px] font-bold text-emerald-900 flex items-center gap-1 select-none">
+              <span>جاهز للطباعة:</span>
+              <span className="font-mono bg-emerald-200/60 text-emerald-950 px-2 py-0.5 rounded-md">
+                {currentTotalPages} صفحة A4
+              </span>
+            </div>
+
             <button
               type="button"
-              onClick={() => onPrint(pageRange)}
-              className="btn btn-success inline-flex items-center gap-1.5 px-4 py-1.5 text-white font-bold rounded-lg cursor-pointer transition-colors bg-[#28a745] hover:bg-[#218838] text-xs shadow-xs"
+              onClick={openPrintModal}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-all bg-emerald-600 hover:bg-emerald-700 text-xs shadow-xs hover:shadow-md"
+              title="فتح إعدادات وخيارات الطباعة وتحديد نطاق الصفحات بدقة"
             >
               <Printer className="w-4 h-4" />
-              <span>📥 طباعة / PDF</span>
+              <span>إعدادات وخيارات الطباعة</span>
             </button>
           </div>
         )}

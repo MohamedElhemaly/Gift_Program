@@ -93,10 +93,16 @@ export const useDoctorStore = create((set, get) => ({
       if (term) {
         const nameMatch = doc.name && doc.name.toLowerCase().includes(term);
         const codeMatch = doc.doc_code && String(doc.doc_code).toLowerCase().includes(term);
+        const specMatch = doc.specialty && doc.specialty.toLowerCase().includes(term);
         const addrMatch = doc.address && doc.address.toLowerCase().includes(term);
+        const gvrMatch = (doc.pageGvr || doc.gvr) && (doc.pageGvr || doc.gvr).toLowerCase().includes(term);
+        const cityMatch = (doc.pageCity || doc.city) && (doc.pageCity || doc.city).toLowerCase().includes(term);
+        const regMatch = (doc.pageRegion || doc.region) && (doc.pageRegion || doc.region).toLowerCase().includes(term);
         const mobMatch = doc.mobile && String(doc.mobile).includes(term);
         const homeMatch = doc.home_tel && String(doc.home_tel).includes(term);
-        if (!nameMatch && !codeMatch && !addrMatch && !mobMatch && !homeMatch) return false;
+        if (!nameMatch && !codeMatch && !specMatch && !addrMatch && !gvrMatch && !cityMatch && !regMatch && !mobMatch && !homeMatch) {
+          return false;
+        }
       }
 
       return true;
@@ -140,6 +146,10 @@ export const useDoctorStore = create((set, get) => ({
   maximizedDoctorIndex: -1,
   isAddDoctorModalOpen: false,
   addDoctorInitialData: null,
+  isPrintModalOpen: false,
+
+  openPrintModal: () => set({ isPrintModalOpen: true }),
+  closePrintModal: () => set({ isPrintModalOpen: false }),
 
   openAddDoctorModal: (initialData = null) => set({ isAddDoctorModalOpen: true, addDoctorInitialData: initialData }),
   closeAddDoctorModal: () => set({ isAddDoctorModalOpen: false, addDoctorInitialData: null }),

@@ -1,16 +1,33 @@
 import React, { useState, useMemo } from 'react';
 import A4Page from './A4Page';
 import { useDoctorStore } from '../../store/useDoctorStore';
-import { ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, Search, Layers, FileSpreadsheet, UserPlus } from 'lucide-react';
+import {
+  ChevronRight,
+  ChevronLeft,
+  ChevronsRight,
+  ChevronsLeft,
+  Search,
+  Layers,
+  FileSpreadsheet,
+  UserPlus,
+  Printer,
+  X,
+} from 'lucide-react';
 
 export default function ReportView({ selectedPages = null }) {
-  const { displayedDoctors, openAddDoctorModal, autoSaveState } = useDoctorStore();
+  const {
+    displayedDoctors,
+    openAddDoctorModal,
+    autoSaveState,
+    filters,
+    setFilter,
+    openPrintModal,
+  } = useDoctorStore();
 
   // Screen Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [pagesPerPage, setPagesPerPage] = useState(10);
   const [jumpInput, setJumpInput] = useState('');
-  const [filterQuery, setFilterQuery] = useState('');
 
   const totalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 
@@ -29,24 +46,6 @@ export default function ReportView({ selectedPages = null }) {
     }
     return p;
   }, [displayedDoctors]);
-
-  // Filter pages by governorate, city, region, or doctor query on screen
-  const filteredPages = useMemo(() => {
-    if (!filterQuery.trim()) return allPages;
-    const q = filterQuery.toLowerCase().trim();
-    return allPages.filter(({ pageDocs }) => {
-      return pageDocs.some((d) => {
-        return (
-          (d.name && d.name.toLowerCase().includes(q)) ||
-          (d.doc_code && String(d.doc_code).toLowerCase().includes(q)) ||
-          (d.pageGvr && d.pageGvr.toLowerCase().includes(q)) ||
-          (d.pageCity && d.pageCity.toLowerCase().includes(q)) ||
-          (d.pageRegion && d.pageRegion.toLowerCase().includes(q)) ||
-          (d.specialty && d.specialty.toLowerCase().includes(q))
-        );
-      });
-    });
-  }, [allPages, filterQuery]);
 
   if (!displayedDoctors || displayedDoctors.length === 0) {
     return null;
@@ -72,34 +71,30 @@ export default function ReportView({ selectedPages = null }) {
   }
 
   // SCREEN MODE: Paginate to keep the browser silky smooth
-  const effectiveTotalPages = filteredPages.length;
+  const effectiveTotalPages = allPages.length;
   const maxPage = pagesPerPage === 'ALL' ? 1 : Math.ceil(effectiveTotalPages / pagesPerPage);
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), maxPage || 1);
 
   const visiblePages = pagesPerPage === 'ALL'
-    ? filteredPages
-    : filteredPages.slice((safeCurrentPage - 1) * pagesPerPage, safeCurrentPage * pagesPerPage);
+    ? allPages
+    : allPages.slice((safeCurrentPage - 1) * pagesPerPage, safeCurrentPage * pagesPerPage);
 
   const handleJump = (e) => {
     e.preventDefault();
     const target = parseInt(jumpInput, 10);
     if (!isNaN(target) && target >= 1 && target <= totalPages) {
-      // Find the page in filtered pages
-      const foundIdx = filteredPages.findIndex((p) => p.pageNum === target);
-      if (foundIdx !== -1) {
-        if (pagesPerPage !== 'ALL') {
-          const newBatch = Math.floor(foundIdx / pagesPerPage) + 1;
-          setCurrentPage(newBatch);
-        }
-        setJumpInput('');
-        // Smooth scroll to page element
-        setTimeout(() => {
-          const el = document.getElementById(`page-${target}`);
-          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      } else {
-        alert(`الصفحة ${target} غير مطابقة لفلتر البحث الحالي.`);
+      if (pagesPerPage !== 'ALL') {
+        const newBatch = Math.floor((target - 1) / pagesPerPage) + 1;
+        setCurrentPage(newBatch);
       }
+      setJumpInput('');
+      // Smooth scroll to page element
+      setTimeout(() => {
+        const el = document.getElementById(`page-${target}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      alert(`الصفحة ${target} غير صالحة. النطاق المتاح: من 1 إلى ${totalPages}`);
     }
   };
 
@@ -139,37 +134,62 @@ export default function ReportView({ selectedPages = null }) {
                 )}
               </div>
               <p className="text-xs text-gray-500">
-                إجمالي الأطباء: {displayedDoctors.filter(d => d.name || d.doc_code).length} طبيب
-                {filteredPages.length !== allPages.length && ` (المطابق للبحث: ${filteredPages.length} صفحة)`}
+                إجمالي الأطباء المعروضين: {displayedDoctors.filter(d => d.name || d.doc_code).length} طبيب
+                {totalPages > 0 && ` (${totalPages} صفحة مقسمة إلى 21 خانة)`}
               </p>
             </div>
           </div>
 
-          {/* Add Doctor Quick Button */}
-          <button
-            type="button"
-            onClick={() => openAddDoctorModal()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
-            title="إضافة طبيب جديد"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>إضافة طبيب</span>
-          </button>
+          {/* Quick Actions (Add Doctor & Print) */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openAddDoctorModal()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+              title="إضافة طبيب جديد"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>إضافة طبيب</span>
+            </button>
 
-          {/* Quick Search on Screen */}
+            <button
+              type="button"
+              onClick={openPrintModal}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-colors cursor-pointer"
+              title="خيارات وإعدادات الطباعة وتحديد نطاق الصفحات"
+            >
+              <Printer className="w-4 h-4" />
+              <span>طباعة ({totalPages} صفحة)</span>
+            </button>
+          </div>
+
+          {/* Quick Search on Screen synchronized with Zustand filters.searchTerm */}
           <div className="flex items-center gap-2 flex-1 max-w-xs min-w-[200px]">
             <div className="relative w-full">
-              <Search className="w-4 h-4 text-gray-400 absolute right-3 top-2.5" />
+              <Search className="w-4 h-4 text-gray-400 absolute right-3 top-2.5 pointer-events-none" />
               <input
                 type="text"
                 placeholder="بحث سريع (طبيب / كود / محافظة)..."
-                value={filterQuery}
+                value={filters?.searchTerm || ''}
                 onChange={(e) => {
-                  setFilterQuery(e.target.value);
+                  setFilter('searchTerm', e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full text-xs pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
+                className="w-full text-xs pr-9 pl-7 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none transition-all"
               />
+              {filters?.searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilter('searchTerm', '');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute left-2 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  title="مسح البحث"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
 

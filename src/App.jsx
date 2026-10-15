@@ -14,6 +14,7 @@ import MoveModal from './components/Modals/MoveModal';
 import CombineModal from './components/Modals/CombineModal';
 import DoctorDetailModal from './components/Modals/DoctorDetailModal';
 import AddDoctorModal from './components/Modals/AddDoctorModal';
+import PrintSettingsModal from './components/Modals/PrintSettingsModal';
 
 import { LogOut, User, Database, RefreshCw } from 'lucide-react';
 
@@ -153,6 +154,7 @@ export default function App() {
           onClose={closeMaximizeModal}
         />
         <AddDoctorModal />
+        <PrintSettingsModal />
       </main>
     </div>
   );

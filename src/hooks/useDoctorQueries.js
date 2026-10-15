@@ -28,6 +28,11 @@ export function useDoctorsData() {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
+            setTimeout(() => {
+              if (useDoctorStore.getState().rawDoctors.length === 0) {
+                setRawDoctorsAndRebuild(parsed);
+              }
+            }, 0);
             return parsed;
           }
         }

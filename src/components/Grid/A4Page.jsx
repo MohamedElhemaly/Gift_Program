@@ -4,12 +4,22 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import { MapPin, Building2, Navigation, FileText, UserPlus, Trash2 } from 'lucide-react';
 
 function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
-  const { updatePageHeader, openAddDoctorModal, deletePage } = useDoctorStore();
+  const { updatePageHeader, openAddDoctorModal, deletePage, distributionMode } = useDoctorStore();
 
   const firstDoc = pageDocs[0] || {};
-  const gvr = firstDoc.pageGvr || '';
-  const city = firstDoc.pageCity || '';
-  const region = firstDoc.pageRegion || '';
+  const lastRealDoc = [...pageDocs].reverse().find((d) => d.name || d.doc_code) || firstDoc;
+
+  const gvr = firstDoc.pageGvr === lastRealDoc.pageGvr || !lastRealDoc.pageGvr
+    ? (firstDoc.pageGvr || '')
+    : `${firstDoc.pageGvr} / ${lastRealDoc.pageGvr}`;
+
+  const city = firstDoc.pageCity === lastRealDoc.pageCity || !lastRealDoc.pageCity
+    ? (firstDoc.pageCity || '')
+    : `${firstDoc.pageCity} / ${lastRealDoc.pageCity}`;
+
+  const region = firstDoc.pageRegion === lastRealDoc.pageRegion || !lastRealDoc.pageRegion
+    ? (firstDoc.pageRegion || '')
+    : `${firstDoc.pageRegion || 'مناطق متعددة'} / ${lastRealDoc.pageRegion || 'مناطق متعددة'}`;
 
   const mGvr = firstDoc.pageGvr_modified ? 'modified' : '';
   const mCity = firstDoc.pageCity_modified ? 'modified' : '';
@@ -36,7 +46,9 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
           <FileText className="w-3.5 h-3.5 text-blue-500 no-print" />
           <span>صفحة {pageNum}</span>
           <span className="no-print bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
-            {realCount} طبيب مسجل {21 - realCount > 0 ? `(+ ${21 - realCount} خانة شاغرة متبقية للطباعة)` : ''}
+            {realCount === 21
+              ? '✨ 21 طبيب (صفحة مكتملة 21/21)'
+              : `${realCount} طبيب مسجل ${21 - realCount > 0 ? `(+ ${21 - realCount} خانة شاغرة)` : ''}`}
           </span>
         </div>
 

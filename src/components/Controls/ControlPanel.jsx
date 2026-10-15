@@ -42,6 +42,8 @@ export default function ControlPanel({ onPrint }) {
     getUniqueFilterOptions,
     showEmptySlotsOnScreen,
     toggleShowEmptySlots,
+    distributionMode,
+    setDistributionMode,
   } = useDoctorStore();
 
   const [loadingAction, setLoadingAction] = useState(false);
@@ -244,7 +246,7 @@ export default function ControlPanel({ onPrint }) {
         </div>
 
         {/* Quick Stats Summary */}
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-2.5 text-xs flex-wrap">
           <div className="bg-white px-3 py-1 rounded-lg border border-slate-200 text-gray-700 font-semibold shadow-xs">
             إجمالي الداتا: <span className="font-bold text-blue-600">{totalRawCount}</span> طبيب
           </div>
@@ -255,18 +257,47 @@ export default function ControlPanel({ onPrint }) {
             </div>
           )}
 
+          {/* Distribution Mode Toggle (Continuous Full 21 vs By Region) */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-500 px-1 select-none">نمط العرض:</span>
+            <button
+              type="button"
+              onClick={() => setDistributionMode('continuous')}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                distributionMode === 'continuous'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="ملء جميع صفحات الـ 21 خانة بأطباء متتاليين بالكامل بدون أي خانات فارغة"
+            >
+              📄 توزيع متتالي كامل (21/صفحة ممتلئة)
+            </button>
+            <button
+              type="button"
+              onClick={() => setDistributionMode('by_region')}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                distributionMode === 'by_region'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="تخصيص صفحة مستقلة لكل منطقة جغرافية"
+            >
+              🗺️ صفحة لكل منطقة
+            </button>
+          </div>
+
           {/* Toggle Empty Slots on Screen */}
           <button
             type="button"
             onClick={toggleShowEmptySlots}
             className={`px-3 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
               showEmptySlotsOnScreen
-                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
                 : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
             }`}
-            title="التبديل بين إظهار شبكة الـ 21 خانة كاملة (بالخانات الشاغرة للطباعة) أو عرض الأطباء الفعليين فقط على الشاشة"
+            title="التبديل بين إظهار شبكة الـ 21 خانة كاملة (بالخانات الشاغرة للطباعة) أو إخفاء الخانات الفارغة"
           >
-            <span>{showEmptySlotsOnScreen ? '🖨️ شبكة الـ 21 خانة A4 (مفعل)' : '👥 عرض الأطباء الفعليين فقط'}</span>
+            <span>{showEmptySlotsOnScreen ? '👁️ إخفاء الخانات الشاغرة على الشاشة' : '🖨️ إظهار خانات الـ 21 الفارغة للطباعة'}</span>
           </button>
         </div>
       </div>

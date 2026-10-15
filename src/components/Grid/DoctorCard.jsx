@@ -112,16 +112,19 @@ function DoctorCard({ doc, index }) {
               <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Serial Counter Badge */}
                 <span
-                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 cursor-text ${getModClass('counter')}`}
-                  contentEditable={true}
-                  suppressContentEditableWarning={true}
-                  data-placeholder="م"
-                  onClick={(e) => e.currentTarget.focus()}
-                  onBlur={(e) => handleBlur('counter', e)}
+                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 ${getModClass('counter')}`}
                   title="المسلسل (انقر للتعديل)"
                 >
-                  <Hash className="w-3 h-3 text-slate-400" />
-                  <span>{doc.counter || index + 1}</span>
+                  <Hash className="w-3 h-3 text-slate-400 select-none" />
+                  <span
+                    className="outline-none cursor-text min-w-[12px] text-center"
+                    contentEditable={true}
+                    suppressContentEditableWarning={true}
+                    data-placeholder="م"
+                    onBlur={(e) => handleBlur('counter', e)}
+                  >
+                    {doc.counter || (index % 21) + 1}
+                  </span>
                 </span>
 
                 {/* Doctor Code Badge */}
@@ -218,29 +221,35 @@ function DoctorCard({ doc, index }) {
               {/* Specialty */}
               <div
                 className={`inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2.5 py-1 rounded-md w-fit cursor-text hover:border-blue-300 transition-colors ${getModClass('specialty')}`}
-                contentEditable={true}
-                suppressContentEditableWarning={true}
-                data-placeholder="التخصص..."
-                onClick={(e) => e.currentTarget.focus()}
-                onBlur={(e) => handleBlur('specialty', e)}
                 title="التخصص (انقر للتعديل)"
               >
-                <Stethoscope className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                <span>{doc.specialty || ''}</span>
+                <Stethoscope className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 select-none" />
+                <span
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  data-placeholder="التخصص..."
+                  className="outline-none min-w-[30px]"
+                  onBlur={(e) => handleBlur('specialty', e)}
+                >
+                  {doc.specialty || ''}
+                </span>
               </div>
 
               {/* Address */}
               <div
                 className={`text-xs text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100/70 cursor-text transition-colors flex items-start gap-1 leading-relaxed ${getModClass('address')}`}
-                contentEditable={true}
-                suppressContentEditableWarning={true}
-                data-placeholder="العنوان والعيادة..."
-                onClick={(e) => e.currentTarget.focus()}
-                onBlur={(e) => handleBlur('address', e)}
                 title="العنوان ومقر العيادة (انقر للتعديل)"
               >
-                <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
-                <span>{doc.address || ''}</span>
+                <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5 select-none" />
+                <span
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  data-placeholder="العنوان والعيادة..."
+                  className="outline-none min-w-[50px] flex-1"
+                  onBlur={(e) => handleBlur('address', e)}
+                >
+                  {doc.address || ''}
+                </span>
               </div>
 
               {/* Moved Notice Badge */}
@@ -263,18 +272,19 @@ function DoctorCard({ doc, index }) {
               {/* Old Stats */}
               <div
                 className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-amber-200 hover:border-amber-400 cursor-text transition-colors ${getModClass('old_stats')}`}
-                contentEditable={true}
-                suppressContentEditableWarning={true}
-                data-placeholder="0"
-                onClick={(e) => e.currentTarget.focus()}
-                onBlur={(e) => handleBlur('old_stats', e)}
                 title="الحالات السابقة (انقر للتعديل)"
               >
                 <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1 select-none">
                   <Activity className="w-3 h-3 text-amber-500" />
                   القديم:
                 </span>
-                <span className="font-mono font-bold text-xs text-slate-800">
+                <span
+                  className="font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center"
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  data-placeholder="0"
+                  onBlur={(e) => handleBlur('old_stats', e)}
+                >
                   {doc.old_stats !== undefined && doc.old_stats !== null ? doc.old_stats : '0'}
                 </span>
               </div>
@@ -282,18 +292,19 @@ function DoctorCard({ doc, index }) {
               {/* New Stats */}
               <div
                 className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-emerald-200 hover:border-emerald-400 cursor-text transition-colors ${getModClass('new_stats')}`}
-                contentEditable={true}
-                suppressContentEditableWarning={true}
-                data-placeholder="0"
-                onClick={(e) => e.currentTarget.focus()}
-                onBlur={(e) => handleBlur('new_stats', e)}
                 title="الحالات الجديدة (انقر للتعديل)"
               >
                 <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 select-none">
                   <Sparkles className="w-3 h-3 text-emerald-500" />
                   الجديد:
                 </span>
-                <span className="font-mono font-bold text-xs text-slate-800">
+                <span
+                  className="font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center"
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  data-placeholder="0"
+                  onBlur={(e) => handleBlur('new_stats', e)}
+                >
                   {doc.new_stats !== undefined && doc.new_stats !== null ? doc.new_stats : '0'}
                 </span>
               </div>
@@ -303,28 +314,34 @@ function DoctorCard({ doc, index }) {
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-700 font-medium">
               <div
                 className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text ${getModClass('mobile')}`}
-                contentEditable={true}
-                suppressContentEditableWarning={true}
-                data-placeholder="موبايل..."
-                onClick={(e) => e.currentTarget.focus()}
-                onBlur={(e) => handleBlur('mobile', e)}
                 title="رقم الموبايل (انقر للتعديل)"
               >
-                <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-                <span>{doc.mobile || ''}</span>
+                <Smartphone className="w-3.5 h-3.5 text-slate-400 select-none" />
+                <span
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  data-placeholder="موبايل..."
+                  className="outline-none min-w-[40px]"
+                  onBlur={(e) => handleBlur('mobile', e)}
+                >
+                  {doc.mobile || ''}
+                </span>
               </div>
 
               <div
                 className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text ${getModClass('home_tel')}`}
-                contentEditable={true}
-                suppressContentEditableWarning={true}
-                data-placeholder="أرضي..."
-                onClick={(e) => e.currentTarget.focus()}
-                onBlur={(e) => handleBlur('home_tel', e)}
                 title="رقم الهاتف الأرضي (انقر للتعديل)"
               >
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                <span>{doc.home_tel || ''}</span>
+                <Phone className="w-3.5 h-3.5 text-slate-400 select-none" />
+                <span
+                  contentEditable={true}
+                  suppressContentEditableWarning={true}
+                  data-placeholder="أرضي..."
+                  className="outline-none min-w-[40px]"
+                  onBlur={(e) => handleBlur('home_tel', e)}
+                >
+                  {doc.home_tel || ''}
+                </span>
               </div>
             </div>
           </>

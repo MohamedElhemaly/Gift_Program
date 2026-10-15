@@ -16,8 +16,15 @@ export const useDoctorStore = create((set, get) => ({
     lastSavedTime: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
   }),
 
+  // Distribution Mode: 'continuous' (21 doctors/page - full boxes, no blanks) | 'by_region' (per-region A4 pages)
+  distributionMode: 'continuous',
+  setDistributionMode: (mode) => {
+    set({ distributionMode: mode });
+    get().rebuildData();
+  },
+
   // Toggle empty padding slots on screen (always preserved in print)
-  showEmptySlotsOnScreen: true,
+  showEmptySlotsOnScreen: false,
   toggleShowEmptySlots: () => set((state) => ({ showEmptySlotsOnScreen: !state.showEmptySlotsOnScreen })),
 
   // Multi-Criteria Filtering System
@@ -206,6 +213,73 @@ export const useDoctorStore = create((set, get) => ({
       return;
     }
 
+    const mode = get().distributionMode || 'continuous';
+
+    // =========================================================================
+    // MODE 1: CONTINUOUS FLOW (التوزيع المتتالي الكامل - كل صفحة 21 طبيب بالكامل بدون خانات فارغة)
+    // =========================================================================
+    if (mode === 'continuous') {
+      // 1. Sort doctors systematically by Governorate > City > Region > Name
+      const realDocs = list.filter((d) => d && (d.name || d.doc_code || d.specialty || d.address));
+      realDocs.sort((a, b) => {
+        const gA = (a.pageGvr || a.gvr || '').localeCompare(b.pageGvr || b.gvr || '', 'ar');
+        if (gA !== 0) return gA;
+        const cA = (a.pageCity || a.city || '').localeCompare(b.pageCity || b.city || '', 'ar');
+        if (cA !== 0) return cA;
+        const rA = (a.pageRegion || a.region || '').localeCompare(b.pageRegion || b.region || '', 'ar');
+        if (rA !== 0) return rA;
+        return (a.name || '').localeCompare(b.name || '', 'ar');
+      });
+
+      // 2. Pad only the very final page to a multiple of 21 for print alignment
+      const rem = realDocs.length % 21;
+      const needed = (realDocs.length === 0) ? 21 : (rem !== 0 ? 21 - rem : 0);
+
+      const continuousList = [...realDocs];
+      const lastDoc = continuousList[continuousList.length - 1] || {};
+      for (let i = 0; i < needed; i++) {
+        continuousList.push({
+          pageGvr: lastDoc.pageGvr || '',
+          pageCity: lastDoc.pageCity || '',
+          pageRegion: lastDoc.pageRegion || '',
+          pageGvr_modified: false,
+          pageCity_modified: false,
+          pageRegion_modified: false,
+          name: '',
+          specialty: '',
+          address: '',
+          mobile: '',
+          home_tel: '',
+          old_stats: '',
+          new_stats: '',
+          counter: '',
+          doc_code: '',
+          is_moved: false,
+          moved_from: '',
+          is_inactive: false,
+          merged_codes: [],
+          is_blank_placeholder: true,
+        });
+      }
+
+      // 3. Assign 1..21 counter for each A4 page
+      for (let idx = 0; idx < continuousList.length; idx++) {
+        const pageItemIndex = (idx % 21) + 1;
+        const d = continuousList[idx];
+        d.counter = (d.doc_code || d.name) ? pageItemIndex : '';
+      }
+
+      if (inputDocs) {
+        set({ displayedDoctors: continuousList, rawDoctors: inputDocs });
+      } else {
+        set({ displayedDoctors: continuousList });
+      }
+      return;
+    }
+
+    // =========================================================================
+    // MODE 2: BY REGION (توزيع حسب المنطقة - النمط الأصلي للطباعة)
+    // =========================================================================
     const groups = {};
     for (let i = 0; i < list.length; i++) {
       const doc = list[i];

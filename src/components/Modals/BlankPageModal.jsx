@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 
 export default function BlankPageModal({ isOpen, onClose }) {

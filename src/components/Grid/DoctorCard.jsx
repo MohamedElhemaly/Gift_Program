@@ -321,4 +321,50 @@ function DoctorCard({ doc, index }) {
               {doc.old_stats !== undefined && doc.old_stats !== null ? doc.old_stats : ''}
             </div>
             <div className={`box ${getModClass('new_stats')}`}>
-         
+              {doc.new_stats !== undefined && doc.new_stats !== null ? doc.new_stats : ''}
+            </div>
+            <div className={`box ${getModClass('counter')}`}>
+              {doc.counter !== undefined && doc.counter !== null ? doc.counter : ''}
+            </div>
+          </div>
+        </div>
+
+        {/* Doctor Information */}
+        <div className="doc-info">
+          <div className={`doc-name ${getModClass('name')}`}>
+            {doc.name || ''}
+          </div>
+          <div className={getModClass('specialty')}>
+            {doc.specialty || ''}
+          </div>
+          <div className={getModClass('address')}>
+            {doc.address || ''}
+          </div>
+          {doc.is_moved && doc.moved_from && (
+            <div className="moved-text note-moved">
+              كان في: {doc.moved_from}
+            </div>
+          )}
+          {doc.merged_codes && doc.merged_codes.length > 0 && (
+            <div className="moved-text note-merged">
+              + مدمج مع: {doc.merged_codes.join(', ')}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Contacts */}
+        <div className="bottom-row">
+          <div className={getModClass('mobile')}>
+            {doc.mobile || ''}
+          </div>
+          <div className={getModClass('home_tel')}>
+            {doc.home_tel || ''}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+export default React.memo(DoctorCard);

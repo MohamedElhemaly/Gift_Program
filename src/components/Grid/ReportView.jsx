@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import A4Page from './A4Page';
 import { useDoctorStore } from '../../store/useDoctorStore';
-import { ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, Search, Layers, FileSpreadsheet } from 'lucide-react';
+import { ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, Search, Layers, FileSpreadsheet, UserPlus } from 'lucide-react';
 
 export default function ReportView({ selectedPages = null }) {
-  const { displayedDoctors } = useDoctorStore();
+  const { displayedDoctors, openAddDoctorModal } = useDoctorStore();
 
   // Screen Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -128,6 +128,17 @@ export default function ReportView({ selectedPages = null }) {
               </p>
             </div>
           </div>
+
+          {/* Add Doctor Quick Button */}
+          <button
+            type="button"
+            onClick={() => openAddDoctorModal()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+            title="إضافة طبيب جديد"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>إضافة طبيب</span>
+          </button>
 
           {/* Quick Search on Screen */}
           <div className="flex items-center gap-2 flex-1 max-w-xs min-w-[200px]">

@@ -11,6 +11,7 @@ import ReportView from './components/Grid/ReportView';
 import MoveModal from './components/Modals/MoveModal';
 import CombineModal from './components/Modals/CombineModal';
 import DoctorDetailModal from './components/Modals/DoctorDetailModal';
+import AddDoctorModal from './components/Modals/AddDoctorModal';
 
 import { LogOut, User, Database } from 'lucide-react';
 
@@ -147,6 +148,7 @@ export default function App() {
           index={maximizedDoctorIndex}
           onClose={closeMaximizeModal}
         />
+        <AddDoctorModal />
       </main>
     </div>
   );

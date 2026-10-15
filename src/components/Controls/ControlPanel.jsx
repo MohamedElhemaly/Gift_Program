@@ -3,7 +3,7 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import { doctorService } from '../../services/doctorService';
 import { parseAndMergeSheets, parseStatsOnly } from '../../lib/excelParser';
 import BlankPageModal from '../Modals/BlankPageModal';
-import { FileSpreadsheet, RefreshCw, Save, PlusCircle, Printer, FolderOpen } from 'lucide-react';
+import { FileSpreadsheet, RefreshCw, Save, PlusCircle, Printer, FolderOpen, UserPlus } from 'lucide-react';
 
 export default function ControlPanel({ onPrint }) {
   const {
@@ -14,6 +14,7 @@ export default function ControlPanel({ onPrint }) {
     importJSON,
     setStatus,
     statusMessage,
+    openAddDoctorModal,
   } = useDoctorStore();
 
   const [loadingAction, setLoadingAction] = useState(false);
@@ -284,6 +285,15 @@ export default function ControlPanel({ onPrint }) {
 
       {/* أزرار الإجراءات */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={() => openAddDoctorModal()}
+          className="btn btn-primary inline-flex items-center gap-1.5 px-5 py-2.5 text-white font-bold rounded cursor-pointer transition-colors bg-blue-600 hover:bg-blue-700 shadow-sm"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>➕ إضافة طبيب جديد</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setIsBlankPageModalOpen(true)}

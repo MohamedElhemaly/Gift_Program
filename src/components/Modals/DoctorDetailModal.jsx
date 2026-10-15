@@ -7,6 +7,7 @@ import {
   GitMerge,
   UserX,
   UserCheck,
+  Trash2,
   Smartphone,
   Phone,
   MapPin,
@@ -24,6 +25,8 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
     openMoveModal,
     openCombineModal,
     toggleInactive,
+    deleteDoctor,
+    clearDoctorSlot,
   } = useDoctorStore();
 
   if (!isOpen || index === -1 || !displayedDoctors[index]) return null;
@@ -97,7 +100,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-xs border transition-colors ${
                 doc.is_inactive
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
-                  : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
               }`}
             >
               {doc.is_inactive ? (
@@ -111,6 +114,33 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   <span>إيقاف</span>
                 </>
               )}
+            </button>
+
+            {/* Clear Doctor Slot */}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                clearDoctorSlot(index);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-bold text-xs border border-amber-200 transition-colors"
+              title="تفريغ بيانات هذه الخانة"
+            >
+              <span>تفريغ</span>
+            </button>
+
+            {/* Delete Doctor */}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                deleteDoctor(index);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs border border-rose-200 transition-colors"
+              title="حذف الطبيب نهائياً"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>حذف</span>
             </button>
 
             {/* Minimize / Close Button */}

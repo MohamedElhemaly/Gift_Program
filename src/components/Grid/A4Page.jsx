@@ -1,10 +1,10 @@
 import React from 'react';
 import DoctorCard from './DoctorCard';
 import { useDoctorStore } from '../../store/useDoctorStore';
-import { MapPin, Building2, Navigation, FileText } from 'lucide-react';
+import { MapPin, Building2, Navigation, FileText, UserPlus, Trash2 } from 'lucide-react';
 
-export default function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
-  const { updatePageHeader } = useDoctorStore();
+function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
+  const { updatePageHeader, openAddDoctorModal, deletePage } = useDoctorStore();
 
   const firstDoc = pageDocs[0] || {};
   const gvr = firstDoc.pageGvr || '';
@@ -22,6 +22,8 @@ export default function A4Page({ pageDocs, pageNum, startIndex, isVisible = true
 
   if (!isVisible) return null;
 
+  const realCount = pageDocs.filter((d) => d.name || d.doc_code).length;
+
   return (
     <div
       className="page bg-white max-w-full rounded-xl shadow-md border border-gray-200 p-4 sm:p-6 mx-auto mb-8 transition-all
@@ -30,12 +32,35 @@ export default function A4Page({ pageDocs, pageNum, startIndex, isVisible = true
     >
       {/* Page indicator (5mm in print) */}
       <div className="flex items-center justify-between text-xs text-gray-500 mb-3 h-[5mm] print:text-[10px] print:text-[#999] print:mb-[5px]">
-        <div className="flex items-center gap-1.5 font-bold">
+        <div className="flex items-center gap-2 font-bold">
           <FileText className="w-3.5 h-3.5 text-blue-500 no-print" />
           <span>صفحة {pageNum}</span>
+          <span className="no-print bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[11px] font-semibold">
+            {realCount} / 21 طبيب
+          </span>
         </div>
-        <div className="no-print text-[11px] text-gray-400 font-medium">
-          (شبكة A4 للطباعة: 21 خانة)
+
+        {/* Page Actions Toolbar (Hidden on Print) */}
+        <div className="no-print flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openAddDoctorModal({ pageGvr: gvr, pageCity: city, pageRegion: region })}
+            className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            title="إضافة طبيب جديد لهذه الصفحة"
+          >
+            <UserPlus className="w-3 h-3" />
+            <span>إضافة طبيب للصفحة</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => deletePage(startIndex)}
+            className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            title="حذف هذه الصفحة بالكامل"
+          >
+            <Trash2 className="w-3 h-3" />
+            <span>حذف الصفحة</span>
+          </button>
         </div>
       </div>
 
@@ -117,3 +142,5 @@ export default function A4Page({ pageDocs, pageNum, startIndex, isVisible = true
     </div>
   );
 }
+
+export default React.memo(A4Page);

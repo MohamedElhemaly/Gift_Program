@@ -3,33 +3,67 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import { doctorService } from '../../services/doctorService';
 import { parseAndMergeSheets, parseStatsOnly } from '../../lib/excelParser';
 import BlankPageModal from '../Modals/BlankPageModal';
-import { FileSpreadsheet, RefreshCw, Save, PlusCircle, Printer, FolderOpen, UserPlus } from 'lucide-react';
+import {
+  FileSpreadsheet,
+  RefreshCw,
+  PlusCircle,
+  Printer,
+  UserPlus,
+  Filter,
+  Search,
+  RotateCcw,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Building2,
+  MapPin,
+  Stethoscope,
+  X,
+  Sparkles,
+} from 'lucide-react';
 
 export default function ControlPanel({ onPrint }) {
   const {
+    rawDoctors,
     displayedDoctors,
     rebuildData,
     addBlankPage,
-    exportJSON,
-    importJSON,
     setStatus,
     statusMessage,
     openAddDoctorModal,
+    autoSaveState,
+    lastSavedTime,
+    filters,
+    setFilter,
+    resetFilters,
+    getUniqueFilterOptions,
   } = useDoctorStore();
 
   const [loadingAction, setLoadingAction] = useState(false);
   const [pageRange, setPageRange] = useState('الكل');
   const [isBlankPageModalOpen, setIsBlankPageModalOpen] = useState(false);
+  const [isExcelOpen, setIsExcelOpen] = useState(false);
 
   // File Input Refs
   const docsFileRef = useRef(null);
   const oldFileRef = useRef(null);
   const newFileRef = useRef(null);
 
-  const loadJsonRef = useRef(null);
-
   const updateOldFileRef = useRef(null);
   const updateNewFileRef = useRef(null);
+
+  // Get dynamic unique options for dropdowns
+  const { governorates, cities, regions, specialties } = getUniqueFilterOptions();
+
+  const hasActiveFilters = Object.entries(filters || {}).some(
+    ([k, v]) => v && v !== 'all'
+  );
+
+  const totalRawCount = (rawDoctors || []).filter((d) => d.name || d.doc_code).length;
+  const currentFilteredCount = (displayedDoctors || []).filter(
+    (d) => d.name || d.doc_code
+  ).length;
+  const currentTotalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 
   /**
    * 1. Generate Report from Excel (Upsert to DB)
@@ -49,9 +83,11 @@ export default function ControlPanel({ onPrint }) {
 
     try {
       const mergedList = await parseAndMergeSheets({ docsFile, oldFile, newFile });
-      
+
       // Upsert to Supabase with live progress callback
-      const result = await doctorService.upsertDoctorsBatch(mergedList, (msg) => setStatus(msg));
+      const result = await doctorService.upsertDoctorsBatch(mergedList, (msg) =>
+        setStatus(msg)
+      );
 
       // Rebuild in Zustand Store
       rebuildData(mergedList);
@@ -70,30 +106,11 @@ export default function ControlPanel({ onPrint }) {
   };
 
   /**
-   * 2. Load JSON Backup
-   */
-  const handleLoadJson = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const parsed = JSON.parse(event.target.result);
-        importJSON(parsed);
-      } catch (err) {
-        alert('خطأ في قراءة ملف الحفظ، تأكد من اختيار ملف .json الصحيح.');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  /**
-   * 3. Update Stats Only (Excel)
+   * 2. Update Stats Only (Excel)
    */
   const handleUpdateStatsOnly = async () => {
     if (displayedDoctors.length === 0) {
-      alert('أنشئ تقرير أولاً أو ارفع ملف حفظ!');
+      alert('لا توجد بيانات حالية! ارفع شيت الأطباء أولاً.');
       return;
     }
 
@@ -110,13 +127,17 @@ export default function ControlPanel({ onPrint }) {
 
     try {
       const statsList = await parseStatsOnly({ oldFile, newFile });
-      const result = await doctorService.updateStatisticsOnlyBatch(statsList, (msg) => setStatus(msg));
+      const result = await doctorService.updateStatisticsOnlyBatch(statsList, (msg) =>
+        setStatus(msg)
+      );
 
       // Apply updates in local store
       const list = [...displayedDoctors];
       let counter = 0;
       statsList.forEach((st) => {
-        const found = list.find((d) => String(d.doc_code).trim() === String(st.doc_code).trim());
+        const found = list.find(
+          (d) => String(d.doc_code).trim() === String(st.doc_code).trim()
+        );
         if (found) {
           if (st.old_stats !== undefined && found.old_stats !== st.old_stats) {
             found.old_stats = st.old_stats;
@@ -147,131 +168,324 @@ export default function ControlPanel({ onPrint }) {
     }
   };
 
-  /**
-   * Add Blank Page dialog
-   */
-  const handleAddBlankPage = () => {
-    const g = prompt('اسم المحافظة:', 'صفحة إضافية');
-    if (g === null) return;
-    const c = prompt('اسم المدينة / المركز:', 'مدينة إضافية');
-    if (c === null) return;
-    const r = prompt('اسم المنطقة:', 'فارغة');
-    if (r === null) return;
-
-    addBlankPage(g, c, r);
-  };
-
   const hasData = displayedDoctors.length > 0;
 
   return (
-    <div className="controls controls-card no-print">
-      {/* 1. إنشاء تقرير جديد من الإكسيل */}
-      <h3 className="controls-heading text-[#007bff] flex items-center gap-2">
-        <FileSpreadsheet className="w-4 h-4 inline-block" />
-        1. إنشاء تقرير جديد من الإكسيل
-      </h3>
+    <div className="controls controls-card no-print space-y-4">
+      {/* 🟢 Real-time Auto-Save & Cloud Status Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-gradient-to-r from-slate-50 to-blue-50/50 border border-slate-200 rounded-xl shadow-xs">
+        <div className="flex items-center gap-2.5">
+          {autoSaveState === 'saving' ? (
+            <div className="flex items-center gap-2 text-amber-700 bg-amber-100/80 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>جاري الحفظ التلقائي في السحابة (Supabase)...</span>
+            </div>
+          ) : autoSaveState === 'error' ? (
+            <div className="flex items-center gap-2 text-red-700 bg-red-100/80 px-3 py-1 rounded-full text-xs font-bold">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>تعذر الاتصال بالسحابة - تم الحفظ محلياً في المتصفح</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-emerald-800 bg-emerald-100/80 px-3 py-1 rounded-full text-xs font-bold shadow-xs">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>الحفظ التلقائي السحابي مفعل: كل تعديل يُحفظ فوراً في قاعدة البيانات</span>
+            </div>
+          )}
 
-      <div className="input-group flex items-center my-2.5">
-        <label className="inline-block w-[220px] font-bold text-gray-700">شيت الدكاترة:</label>
-        <input
-          type="file"
-          ref={docsFileRef}
-          accept=".xlsx, .xls"
-          className="text-sm text-gray-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:bg-gray-50 file:text-xs file:font-semibold hover:file:bg-gray-100 cursor-pointer"
-        />
+          {lastSavedTime && (
+            <span className="text-[11px] text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              آخر حفظ: {lastSavedTime}
+            </span>
+          )}
+        </div>
+
+        {/* Quick Stats Summary */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="bg-white px-3 py-1 rounded-lg border border-slate-200 text-gray-700 font-semibold shadow-xs">
+            إجمالي الداتا: <span className="font-bold text-blue-600">{totalRawCount}</span> طبيب
+          </div>
+          {hasActiveFilters && (
+            <div className="bg-blue-600 text-white px-3 py-1 rounded-lg font-bold shadow-xs flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              المعروض بعد الفلترة: {currentFilteredCount} طبيب ({currentTotalPages} صفحة A4)
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="input-group flex items-center my-2.5">
-        <label className="inline-block w-[220px] font-bold text-gray-700">شيت القديم:</label>
-        <input
-          type="file"
-          ref={oldFileRef}
-          accept=".xlsx, .xls"
-          className="text-sm text-gray-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:bg-gray-50 file:text-xs file:font-semibold hover:file:bg-gray-100 cursor-pointer"
-        />
+      {/* 🔍 1. نظام الفلترة والبحث المتقدم (Multi-Criteria Filtering) */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+          <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+            <Filter className="w-4 h-4 text-blue-600" />
+            <span>نظام الفلترة والبحث المتقدم</span>
+            {hasActiveFilters && (
+              <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                فلتر مفعّل
+              </span>
+            )}
+          </h3>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs text-red-600 hover:text-red-800 font-bold flex items-center gap-1 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>إعادة تعيين الفلاتر (عرض الكل)</span>
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {/* فلتر المحافظة */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <Building2 className="w-3 h-3 text-gray-400" />
+              <span>المحافظة:</span>
+            </label>
+            <select
+              value={filters?.governorate || ''}
+              onChange={(e) => setFilter('governorate', e.target.value)}
+              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">جميع المحافظات ({governorates.length})</option>
+              {governorates.map((gov) => (
+                <option key={gov} value={gov}>
+                  {gov}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* فلتر المدينة / المركز */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-gray-400" />
+              <span>المدينة / المركز:</span>
+            </label>
+            <select
+              value={filters?.city || ''}
+              onChange={(e) => setFilter('city', e.target.value)}
+              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">جميع المدن ({cities.length})</option>
+              {cities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* فلتر المنطقة */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-gray-400" />
+              <span>المنطقة:</span>
+            </label>
+            <select
+              value={filters?.region || ''}
+              onChange={(e) => setFilter('region', e.target.value)}
+              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">جميع المناطق ({regions.length})</option>
+              {regions.map((reg) => (
+                <option key={reg} value={reg}>
+                  {reg}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* فلتر التخصص */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <Stethoscope className="w-3 h-3 text-gray-400" />
+              <span>التخصص:</span>
+            </label>
+            <select
+              value={filters?.specialty || ''}
+              onChange={(e) => setFilter('specialty', e.target.value)}
+              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="">جميع التخصصات ({specialties.length})</option>
+              {specialties.map((spec) => (
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* فلتر الحالة */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <span>الحالة:</span>
+            </label>
+            <select
+              value={filters?.status || 'all'}
+              onChange={(e) => setFilter('status', e.target.value)}
+              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="all">الكل (نشط وغير نشط)</option>
+              <option value="active">الأطباء النشطين فقط</option>
+              <option value="inactive">الأطباء المتوقفين فقط</option>
+              <option value="moved">الأطباء المنقولين فقط</option>
+            </select>
+          </div>
+
+          {/* بحث بالاسم / الكود / الموبايل */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
+              <Search className="w-3 h-3 text-gray-400" />
+              <span>اسم الطبيب / الكود:</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="ابحث بالاسم أو الكود..."
+                value={filters?.searchTerm || ''}
+                onChange={(e) => setFilter('searchTerm', e.target.value)}
+                className="w-full text-xs p-2 pl-7 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+              {filters?.searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setFilter('searchTerm', '')}
+                  className="absolute left-2 top-2.5 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="input-group flex items-center my-2.5">
-        <label className="inline-block w-[220px] font-bold text-gray-700">شيت الجديد:</label>
-        <input
-          type="file"
-          ref={newFileRef}
-          accept=".xlsx, .xls"
-          className="text-sm text-gray-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:bg-gray-50 file:text-xs file:font-semibold hover:file:bg-gray-100 cursor-pointer"
-        />
+      {/* 📁 2. قسم استيراد وتحديث شيتات الإكسيل (طي / فتح اختياري) */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setIsExcelOpen(!isExcelOpen)}
+            className="flex items-center gap-2 text-sm font-bold text-[#007bff] hover:text-[#0056b3] cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>استيراد وتحديث شيتات الإكسيل (Excel Sync / Upsert)</span>
+            <span className="text-[11px] text-gray-400 font-normal">
+              {isExcelOpen ? '▲ إخفاء' : '▼ إظهار أدوات الاستيراد'}
+            </span>
+          </button>
+        </div>
+
+        {isExcelOpen && (
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-4">
+            {/* استيراد تقرير كامل */}
+            <div>
+              <h4 className="text-xs font-bold text-gray-700 mb-2">
+                1. استيراد أطباء جدد أو شيت كامل (Upsert):
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    شيت الدكاترة:
+                  </label>
+                  <input
+                    type="file"
+                    ref={docsFileRef}
+                    accept=".xlsx, .xls"
+                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
+                  />
+                </div>
+
+                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    شيت القديم:
+                  </label>
+                  <input
+                    type="file"
+                    ref={oldFileRef}
+                    accept=".xlsx, .xls"
+                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
+                  />
+                </div>
+
+                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    شيت الجديد:
+                  </label>
+                  <input
+                    type="file"
+                    ref={newFileRef}
+                    accept=".xlsx, .xls"
+                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={loadingAction}
+                onClick={handleGenerateReport}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-[#007bff] hover:bg-[#0056b3] text-xs shadow-xs disabled:opacity-50"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>{loadingAction ? 'جاري المعالجة والمزامنة...' : 'مزامنة وحفظ الشيت في السحابة'}</span>
+              </button>
+            </div>
+
+            {/* تحديث أرقام الحالات فقط */}
+            <div className="pt-3 border-t border-slate-100">
+              <h4 className="text-xs font-bold text-gray-700 mb-2">
+                2. تحديث أرقام الحالات فقط (بدون تعديل العناوين):
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    شيت القديم:
+                  </label>
+                  <input
+                    type="file"
+                    ref={updateOldFileRef}
+                    accept=".xlsx, .xls"
+                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
+                  />
+                </div>
+
+                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    شيت الجديد:
+                  </label>
+                  <input
+                    type="file"
+                    ref={updateNewFileRef}
+                    accept=".xlsx, .xls"
+                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={loadingAction}
+                onClick={handleUpdateStatsOnly}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-slate-700 hover:bg-slate-800 text-xs shadow-xs disabled:opacity-50"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>تحديث الحالات فقط</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <button
-        type="button"
-        disabled={loadingAction}
-        onClick={handleGenerateReport}
-        className="btn btn-primary inline-flex items-center gap-1.5 px-5 py-2.5 text-white font-bold rounded cursor-pointer transition-colors bg-[#007bff] hover:bg-[#0056b3] mt-2.5 ml-1.5 disabled:opacity-50"
-      >
-        <FileSpreadsheet className="w-4 h-4" />
-        <span>{loadingAction ? 'جاري المعالجة والمزامنة...' : 'إنشاء التقرير'}</span>
-      </button>
-
-      <hr className="my-5 border-0 border-t border-[#ddd]" />
-
-      {/* 2. استكمال عمل محفوظ سابقاً */}
-      <h3 className="controls-heading text-[#007bff] flex items-center gap-2">
-        <FolderOpen className="w-4 h-4 inline-block" />
-        2. استكمال عمل محفوظ سابقاً
-      </h3>
-
-      <div className="input-group flex items-center my-2.5">
-        <label className="inline-block w-[220px] font-bold text-gray-700">ارفع ملف الحفظ (.json):</label>
-        <input
-          type="file"
-          ref={loadJsonRef}
-          accept=".json"
-          onChange={handleLoadJson}
-          className="text-sm text-gray-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:bg-gray-50 file:text-xs file:font-semibold hover:file:bg-gray-100 cursor-pointer"
-        />
-      </div>
-
-      <hr className="my-5 border-0 border-t border-[#ddd]" />
-
-      {/* 3. تحديث أرقام الحالات (للتحديث فقط) */}
-      <h3 className="controls-heading text-[#007bff] flex items-center gap-2">
-        <RefreshCw className="w-4 h-4 inline-block" />
-        3. تحديث أرقام الحالات (للتحديث فقط)
-      </h3>
-
-      <div className="input-group flex items-center my-2.5">
-        <label className="inline-block w-[220px] font-bold text-gray-700">شيت القديم:</label>
-        <input
-          type="file"
-          ref={updateOldFileRef}
-          accept=".xlsx, .xls"
-          className="text-sm text-gray-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:bg-gray-50 file:text-xs file:font-semibold hover:file:bg-gray-100 cursor-pointer"
-        />
-      </div>
-
-      <div className="input-group flex items-center my-2.5">
-        <label className="inline-block w-[220px] font-bold text-gray-700">شيت الجديد:</label>
-        <input
-          type="file"
-          ref={updateNewFileRef}
-          accept=".xlsx, .xls"
-          className="text-sm text-gray-700 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border file:border-gray-300 file:bg-gray-50 file:text-xs file:font-semibold hover:file:bg-gray-100 cursor-pointer"
-        />
-      </div>
-
-      <button
-        type="button"
-        disabled={loadingAction}
-        onClick={handleUpdateStatsOnly}
-        className="btn btn-secondary inline-flex items-center gap-1.5 px-5 py-2.5 text-white font-bold rounded cursor-pointer transition-colors bg-[#6c757d] hover:bg-[#5a6268] mt-2.5 ml-1.5 disabled:opacity-50"
-      >
-        <RefreshCw className="w-4 h-4" />
-        <span>🔄 تحديث الحالات فقط</span>
-      </button>
-
-      {/* الحالة / التنبيه */}
+      {/* تنبيه الحالة إن وجد */}
       {statusMessage && (
         <div
-          className={`font-bold mt-3 p-2.5 rounded text-sm border ${
+          className={`font-bold p-3 rounded-lg text-xs border ${
             statusMessage.isError
               ? 'bg-[#f8d7da] text-[#721c24] border-[#f5c6cb]'
               : 'bg-[#d4edda] text-[#155724] border-[#c3e6cb]'
@@ -281,59 +495,48 @@ export default function ControlPanel({ onPrint }) {
         </div>
       )}
 
-      <hr className="my-5 border-0 border-t border-[#ddd]" />
+      {/* 🚀 3. أزرار الإجراءات الرئيسية والطباعة */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openAddDoctorModal()}
+            className="btn btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-blue-600 hover:bg-blue-700 shadow-xs text-xs"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>➕ إضافة طبيب جديد</span>
+          </button>
 
-      {/* أزرار الإجراءات */}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button
-          type="button"
-          onClick={() => openAddDoctorModal()}
-          className="btn btn-primary inline-flex items-center gap-1.5 px-5 py-2.5 text-white font-bold rounded cursor-pointer transition-colors bg-blue-600 hover:bg-blue-700 shadow-sm"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>➕ إضافة طبيب جديد</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setIsBlankPageModalOpen(true)}
+            className="btn btn-info inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-[#17a2b8] hover:bg-[#117a8b] text-xs shadow-xs"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>➕ إضافة صفحة فارغة</span>
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => setIsBlankPageModalOpen(true)}
-          className="btn btn-info inline-flex items-center gap-1.5 px-5 py-2.5 text-white font-bold rounded cursor-pointer transition-colors bg-[#17a2b8] hover:bg-[#117a8b]"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>➕ إضافة صفحة فارغة</span>
-        </button>
-
+        {/* خيارات الطباعة */}
         {hasData && (
-          <>
+          <div className="flex items-center gap-2 bg-slate-50 p-1.5 px-3 rounded-xl border border-slate-200">
+            <label className="font-bold text-gray-700 text-xs">الصفحات:</label>
+            <input
+              type="text"
+              value={pageRange}
+              onChange={(e) => setPageRange(e.target.value)}
+              placeholder="مثال: 1-3 أو الكل"
+              className="p-1.5 border border-slate-300 rounded text-center font-bold text-xs w-28 bg-white focus:outline-none focus:border-green-500"
+            />
             <button
               type="button"
-              onClick={exportJSON}
-              className="btn btn-warning inline-flex items-center gap-1.5 px-5 py-2.5 text-black font-bold rounded cursor-pointer transition-colors bg-[#ffc107] hover:bg-[#e0a800]"
+              onClick={() => onPrint(pageRange)}
+              className="btn btn-success inline-flex items-center gap-1.5 px-4 py-1.5 text-white font-bold rounded-lg cursor-pointer transition-colors bg-[#28a745] hover:bg-[#218838] text-xs shadow-xs"
             >
-              <Save className="w-4 h-4" />
-              <span>💾 حفظ نسخة (.json)</span>
+              <Printer className="w-4 h-4" />
+              <span>📥 طباعة / PDF</span>
             </button>
-
-            {/* خيارات الطباعة */}
-            <div className="inline-flex items-center gap-2 mr-3 pr-3 border-r-2 border-[#ccc]">
-              <label className="font-bold text-gray-700">اختر الصفحات:</label>
-              <input
-                type="text"
-                value={pageRange}
-                onChange={(e) => setPageRange(e.target.value)}
-                placeholder="مثال: 1-3"
-                className="p-2 border border-[#ccc] rounded w-[180px] text-center font-bold text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => onPrint(pageRange)}
-                className="btn btn-success inline-flex items-center gap-1.5 px-5 py-2.5 text-white font-bold rounded cursor-pointer transition-colors bg-[#28a745] hover:bg-[#218838]"
-              >
-                <Printer className="w-4 h-4" />
-                <span>📥 طباعة / PDF</span>
-              </button>
-            </div>
-          </>
+          </div>
         )}
       </div>
 

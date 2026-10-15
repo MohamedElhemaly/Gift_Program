@@ -4,7 +4,7 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import { ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, Search, Layers, FileSpreadsheet, UserPlus } from 'lucide-react';
 
 export default function ReportView({ selectedPages = null }) {
-  const { displayedDoctors, openAddDoctorModal } = useDoctorStore();
+  const { displayedDoctors, openAddDoctorModal, autoSaveState } = useDoctorStore();
 
   // Screen Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -108,7 +108,7 @@ export default function ReportView({ selectedPages = null }) {
       {/* On-Screen Navigation & Performance Pagination Toolbar (Hidden on Print) */}
       <div className="no-print bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6 sticky top-14 z-40 backdrop-blur-md bg-white/95">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Summary Info */}
+          {/* Summary Info & Live AutoSave Indicator */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
               <FileSpreadsheet className="w-5 h-5" />
@@ -121,6 +121,22 @@ export default function ReportView({ selectedPages = null }) {
                 <span className="bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full">
                   {totalPages} صفحة A4
                 </span>
+                {/* Auto-Save Live Status */}
+                {autoSaveState === 'saving' ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    جاري الحفظ...
+                  </span>
+                ) : autoSaveState === 'error' ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                    حفظ محلي
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    تم الحفظ تلقائياً
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500">
                 إجمالي الأطباء: {displayedDoctors.filter(d => d.name || d.doc_code).length} طبيب

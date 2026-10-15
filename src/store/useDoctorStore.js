@@ -8,6 +8,120 @@ export const useDoctorStore = create((set, get) => ({
   loading: false,
   statusMessage: null, // { text: string, isError: boolean }
   
+  // Auto-Save Realtime Status
+  autoSaveState: 'saved', // 'saved' | 'saving' | 'error'
+  lastSavedTime: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+  setAutoSaveState: (state) => set({
+    autoSaveState: state,
+    lastSavedTime: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+  }),
+
+  // Multi-Criteria Filtering System
+  filters: {
+    governorate: '',
+    city: '',
+    region: '',
+    specialty: '',
+    searchTerm: '',
+    status: 'all', // 'all' | 'active' | 'inactive' | 'moved'
+  },
+
+  setFilter: (key, value) => {
+    const cur = get().filters;
+    const updated = { ...cur, [key]: value };
+    if (key === 'governorate' && value !== cur.governorate) {
+      updated.city = '';
+      updated.region = '';
+    } else if (key === 'city' && value !== cur.city) {
+      updated.region = '';
+    }
+    set({ filters: updated });
+    get().rebuildData();
+  },
+
+  resetFilters: () => {
+    set({
+      filters: {
+        governorate: '',
+        city: '',
+        region: '',
+        specialty: '',
+        searchTerm: '',
+        status: 'all',
+      },
+    });
+    get().rebuildData(get().rawDoctors);
+  },
+
+  getFilteredDoctors: () => {
+    const { rawDoctors, filters } = get();
+    if (!rawDoctors || rawDoctors.length === 0) return [];
+    if (!filters) return rawDoctors;
+
+    const gvr = (filters.governorate || '').trim();
+    const city = (filters.city || '').trim();
+    const reg = (filters.region || '').trim();
+    const spec = (filters.specialty || '').trim();
+    const term = (filters.searchTerm || '').trim().toLowerCase();
+    const status = filters.status || 'all';
+
+    return rawDoctors.filter((doc) => {
+      if (!doc.name && !doc.doc_code && !doc.specialty && !doc.address && !doc.mobile && !doc.old_stats && !doc.new_stats) {
+        return false;
+      }
+
+      if (gvr && (doc.pageGvr || doc.gvr || '').trim() !== gvr) return false;
+      if (city && (doc.pageCity || doc.city || '').trim() !== city) return false;
+      if (reg && (doc.pageRegion || doc.region || '').trim() !== reg) return false;
+      if (spec && (doc.specialty || '').trim() !== spec) return false;
+
+      if (status === 'active' && doc.is_inactive) return false;
+      if (status === 'inactive' && !doc.is_inactive) return false;
+      if (status === 'moved' && !doc.is_moved) return false;
+
+      if (term) {
+        const nameMatch = doc.name && doc.name.toLowerCase().includes(term);
+        const codeMatch = doc.doc_code && String(doc.doc_code).toLowerCase().includes(term);
+        const addrMatch = doc.address && doc.address.toLowerCase().includes(term);
+        const mobMatch = doc.mobile && String(doc.mobile).includes(term);
+        const homeMatch = doc.home_tel && String(doc.home_tel).includes(term);
+        if (!nameMatch && !codeMatch && !addrMatch && !mobMatch && !homeMatch) return false;
+      }
+
+      return true;
+    });
+  },
+
+  getUniqueFilterOptions: () => {
+    const raw = get().rawDoctors || [];
+    const { filters } = get();
+
+    const governorates = new Set();
+    const cities = new Set();
+    const regions = new Set();
+    const specialties = new Set();
+
+    for (let i = 0; i < raw.length; i++) {
+      const d = raw[i];
+      const g = (d.pageGvr || d.gvr || '').trim();
+      const c = (d.pageCity || d.city || '').trim();
+      const r = (d.pageRegion || d.region || '').trim();
+      const s = (d.specialty || '').trim();
+
+      if (g) governorates.add(g);
+      if (c && (!filters?.governorate || g === filters.governorate)) cities.add(c);
+      if (r && (!filters?.city || c === filters.city) && (!filters?.governorate || g === filters.governorate)) regions.add(r);
+      if (s) specialties.add(s);
+    }
+
+    return {
+      governorates: Array.from(governorates).sort(),
+      cities: Array.from(cities).sort(),
+      regions: Array.from(regions).sort(),
+      specialties: Array.from(specialties).sort(),
+    };
+  },
+
   // Modals state
   activeModalIndex: -1,
   isMoveModalOpen: false,
@@ -59,9 +173,13 @@ export const useDoctorStore = create((set, get) => ({
    * The core 21-item sorting, group-by, and padding algorithm - OPTIMIZED FOR 15,000+ ITEMS
    */
   rebuildData: (inputDocs = null) => {
-    const list = inputDocs || get().rawDoctors;
+    let list = inputDocs;
+    if (!list) {
+      const hasActiveFilters = Object.entries(get().filters || {}).some(([k, v]) => v && v !== 'all');
+      list = hasActiveFilters ? get().getFilteredDoctors() : get().rawDoctors;
+    }
     if (!list || list.length === 0) {
-      set({ displayedDoctors: [], rawDoctors: [] });
+      set({ displayedDoctors: [] });
       return;
     }
 
@@ -141,11 +259,15 @@ export const useDoctorStore = create((set, get) => ({
       }
     }
 
-    set({ displayedDoctors: formattedList, rawDoctors: list });
+    if (inputDocs) {
+      set({ displayedDoctors: formattedList, rawDoctors: inputDocs });
+    } else {
+      set({ displayedDoctors: formattedList });
+    }
   },
 
   /**
-   * Inline Edit Handler
+   * Inline Edit Handler with Auto-Save
    */
   updateInlineItem: async (index, field, value) => {
     const list = [...get().displayedDoctors];
@@ -160,26 +282,41 @@ export const useDoctorStore = create((set, get) => ({
     item[field + '_modified'] = true;
     item[field + '_updated'] = false;
 
-    set({ displayedDoctors: list });
+    // Keep rawDoctors updated too
+    const raw = get().rawDoctors.map((d) => {
+      if ((item.id && d.id === item.id) || (item.doc_code && d.doc_code === item.doc_code)) {
+        return { ...d, [field]: newVal };
+      }
+      return d;
+    });
 
-    // Sync to Supabase if doctor exists
+    set({ displayedDoctors: list, rawDoctors: raw });
+    get().setAutoSaveState('saving');
+
+    // Auto-save to Supabase if doctor exists
     if (item.id || item.doc_code) {
       try {
         await doctorService.updateDoctorField(item.id, item.doc_code, field, newVal);
+        get().setAutoSaveState('saved');
       } catch (err) {
         console.error('Failed to update field on DB:', err);
+        get().setAutoSaveState('error');
       }
+    } else {
+      get().setAutoSaveState('saved');
     }
   },
 
   /**
-   * Page Header (Governorate / City / Region) Inline Edit Handler
+   * Page Header (Governorate / City / Region) Inline Edit Handler with Auto-Save
    */
   updatePageHeader: async (startIndex, field, value) => {
     const list = [...get().displayedDoctors];
     const oldVal = String(list[startIndex]?.[field] || '').trim();
     const newVal = String(value || '').trim();
     if (newVal === oldVal) return;
+
+    get().setAutoSaveState('saving');
 
     // Update the 21 items in this specific page
     for (let i = 0; i < 21; i++) {
@@ -190,11 +327,12 @@ export const useDoctorStore = create((set, get) => ({
     }
 
     set({ displayedDoctors: list });
-    get().rebuildData(list);
+    get().rebuildData();
+    get().setAutoSaveState('saved');
   },
 
   /**
-   * Toggle Inactive
+   * Toggle Inactive with Auto-Save
    */
   toggleInactive: async (index) => {
     const list = [...get().displayedDoctors];
@@ -203,13 +341,18 @@ export const useDoctorStore = create((set, get) => ({
 
     doc.is_inactive = !doc.is_inactive;
     set({ displayedDoctors: list });
+    get().setAutoSaveState('saving');
 
     if (doc.id || doc.doc_code) {
       try {
         await doctorService.toggleInactive(doc);
+        get().setAutoSaveState('saved');
       } catch (err) {
         console.error('Failed to toggle inactive on DB:', err);
+        get().setAutoSaveState('error');
       }
+    } else {
+      get().setAutoSaveState('saved');
     }
   },
 
@@ -223,7 +366,7 @@ export const useDoctorStore = create((set, get) => ({
   closeCombineModal: () => set({ activeModalIndex: -1, isCombineModalOpen: false }),
 
   /**
-   * Confirm Move
+   * Confirm Move with Auto-Save
    */
   confirmMove: async (destination) => {
     const { activeModalIndex, displayedDoctors } = get();
@@ -245,19 +388,22 @@ export const useDoctorStore = create((set, get) => ({
     doc.pageRegion_modified = true;
 
     get().closeMoveModal();
-    get().rebuildData([...displayedDoctors]);
+    get().rebuildData();
+    get().setAutoSaveState('saving');
 
     try {
       await doctorService.moveDoctor(doc, gvr, city, region);
+      get().setAutoSaveState('saved');
       get().setStatus(`تم نقل الطبيب بنجاح إلى: ${gvr} - ${city} - ${region}`);
     } catch (err) {
       console.error('Failed to move doctor on DB:', err);
+      get().setAutoSaveState('error');
       get().setStatus('خطأ أثناء النقل: ' + err.message, true);
     }
   },
 
   /**
-   * Confirm Combine
+   * Confirm Combine with Auto-Save
    */
   confirmCombine: async (sourceCode) => {
     const { activeModalIndex, displayedDoctors } = get();
@@ -314,12 +460,15 @@ export const useDoctorStore = create((set, get) => ({
 
     get().closeCombineModal();
     set({ displayedDoctors: [...displayedDoctors] });
+    get().setAutoSaveState('saving');
 
     try {
       await doctorService.combineDoctors(targetDoc.doc_code, codeToMerge);
+      get().setAutoSaveState('saved');
       get().setStatus(`تم دمج الطبيب (${codeToMerge}) مع (${targetDoc.doc_code}) بنجاح.`);
     } catch (err) {
       console.error('Failed to combine doctors on DB:', err);
+      get().setAutoSaveState('error');
       get().setStatus('خطأ أثناء الدمج: ' + err.message, true);
     }
   },
@@ -357,22 +506,25 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
-   * Add a new Doctor (Create)
+   * Add a new Doctor (Create) with Auto-Save
    */
   addDoctor: async (doctorData) => {
     set({ loading: true });
+    get().setAutoSaveState('saving');
     try {
       const res = await doctorService.addDoctor(doctorData);
       const newDoc = res.doctor || doctorData;
 
       const raw = [...get().rawDoctors, newDoc];
       get().rebuildData(raw);
+      get().setAutoSaveState('saved');
 
       get().setStatus(`تمت إضافة الطبيب "${newDoc.name || newDoc.doc_code}" بنجاح!`);
       set({ loading: false, isAddDoctorModalOpen: false, addDoctorInitialData: null });
       return { success: true };
     } catch (err) {
       console.error('Failed to add doctor:', err);
+      get().setAutoSaveState('error');
       get().setStatus('فشل إضافة الطبيب: ' + err.message, true);
       set({ loading: false });
       return { success: false, error: err.message };
@@ -380,7 +532,7 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
-   * Delete a Doctor (Delete)
+   * Delete a Doctor (Delete) with Auto-Save
    */
   deleteDoctor: async (index) => {
     const list = [...get().displayedDoctors];
@@ -392,12 +544,18 @@ export const useDoctorStore = create((set, get) => ({
       return;
     }
 
+    get().setAutoSaveState('saving');
+
     if (doc.id || doc.doc_code) {
       try {
         await doctorService.deleteDoctor(doc);
+        get().setAutoSaveState('saved');
       } catch (err) {
         console.error('Failed to delete on DB:', err);
+        get().setAutoSaveState('error');
       }
+    } else {
+      get().setAutoSaveState('saved');
     }
 
     // Filter out from rawDoctors
@@ -412,7 +570,7 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
-   * Clear doctor slot (revert slot to empty placeholder)
+   * Clear doctor slot (revert slot to empty placeholder) with Auto-Save
    */
   clearDoctorSlot: async (index) => {
     const list = [...get().displayedDoctors];
@@ -421,12 +579,18 @@ export const useDoctorStore = create((set, get) => ({
 
     if (!window.confirm('هل تريد تفريغ بيانات هذه الخانة؟')) return;
 
+    get().setAutoSaveState('saving');
+
     if (doc.id || doc.doc_code) {
       try {
         await doctorService.deleteDoctor(doc);
+        get().setAutoSaveState('saved');
       } catch (err) {
         console.error('Failed to clear slot in DB:', err);
+        get().setAutoSaveState('error');
       }
+    } else {
+      get().setAutoSaveState('saved');
     }
 
     Object.assign(doc, {
@@ -454,7 +618,7 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
-   * Delete entire page (Delete)
+   * Delete entire page with Auto-Save
    */
   deletePage: async (startIndex) => {
     const list = get().displayedDoctors;
@@ -467,6 +631,8 @@ export const useDoctorStore = create((set, get) => ({
     if (!window.confirm(`هل أنت متأكد من حذف صفحة (${locName}) بالكامل بجميع أطبائها؟`)) {
       return;
     }
+
+    get().setAutoSaveState('saving');
 
     const realDocs = pageSlice.filter((d) => d.id || d.doc_code);
     for (const d of realDocs) {
@@ -487,35 +653,7 @@ export const useDoctorStore = create((set, get) => ({
     });
 
     get().rebuildData(newRaw);
+    get().setAutoSaveState('saved');
     get().setStatus(`تم حذف صفحة (${locName}) بنجاح.`);
-  },
-
-  /**
-   * Save JSON Backup
-   */
-  exportJSON: () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(get().displayedDoctors));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute('href', dataStr);
-    dlAnchorElem.setAttribute('download', 'doctors_report_backup.json');
-    document.body.appendChild(dlAnchorElem);
-    dlAnchorElem.click();
-    dlAnchorElem.remove();
-  },
-
-  /**
-   * Load JSON Backup
-   */
-  importJSON: (jsonData) => {
-    jsonData.forEach((d) => {
-      if (d.pageCity && !d.pageGvr) {
-        d.pageGvr = d.pageCity;
-        d.pageCity = '';
-        d.pageGvr_modified = d.pageCity_modified;
-        d.pageCity_modified = false;
-      }
-    });
-    get().rebuildData(jsonData);
-    get().setStatus('تم تحميل البيانات السابقة بنجاح!');
   },
 }));

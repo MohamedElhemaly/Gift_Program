@@ -15,6 +15,25 @@ export const COL_DEFS = {
   count_new: ['new', 'جديد'],
 };
 
+export function cleanGeneralText(val) {
+  if (val === undefined || val === null) return '';
+  return String(val)
+    .replace(/[%*#_~^]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function cleanDoctorName(val) {
+  if (val === undefined || val === null) return '';
+  const str = cleanGeneralText(val);
+  const withoutPrefix = str
+    .replace(/^أ\.?\s*د\s*\/?:?\s*/i, '')
+    .replace(/^د\s*\/?:?\s*/i, '')
+    .trim();
+  if (!withoutPrefix) return '';
+  return 'أ.د/ ' + withoutPrefix;
+}
+
 /**
  * Smart Column Mapping scanning all keys from the top rows
  */
@@ -164,28 +183,24 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
         if (idCode === '') return;
 
         if (!doctorsMap[idCode]) {
-          let n = row[mapConf.name] || '';
-          if (n && !String(n).includes('أ.د/')) {
-            n = 'أ.د/ ' + n;
-          }
-
-          const gvr = String(row[mapConf.gvr] || '').trim();
-          const city = String(row[mapConf.city] || '').trim();
-          const region = String(row[mapConf.region] || '').trim();
+          const n = cleanDoctorName(row[mapConf.name] || '');
+          const gvr = cleanGeneralText(row[mapConf.gvr] || '');
+          const city = cleanGeneralText(row[mapConf.city] || '');
+          const region = cleanGeneralText(row[mapConf.region] || '');
 
           doctorsMap[idCode] = {
-            doc_code: idCode,
+            doc_code: cleanGeneralText(idCode),
             name: n,
-            specialty: String(row[mapConf.specialty] || '').trim(),
-            address: String(row[mapConf.address] || '').trim(),
+            specialty: cleanGeneralText(row[mapConf.specialty] || ''),
+            address: cleanGeneralText(row[mapConf.address] || ''),
             gvr,
             city,
             region,
             pageGvr: gvr,
             pageCity: city,
             pageRegion: region,
-            mobile: String(row[mapConf.mobile] || '').trim(),
-            home_tel: String(row[mapConf.home_tel] || '').trim(),
+            mobile: cleanGeneralText(row[mapConf.mobile] || ''),
+            home_tel: cleanGeneralText(row[mapConf.home_tel] || ''),
             old_stats: '',
             new_stats: '',
             is_moved: false,

@@ -1,4 +1,5 @@
 import { useDoctorStore } from '../store/useDoctorStore';
+import { cleanDoctorName, cleanGeneralText } from '../services/doctorService';
 
 /**
  * HTML Escaping helper
@@ -216,13 +217,17 @@ function renderDoctorCardHTML(doc) {
     return '';
   };
 
-  const movedClass = doc.is_moved ? 'moved-highlight' : '';
+  const cleanName = cleanDoctorName(doc.name) || doc.name || '';
+  const cleanSpecialty = cleanGeneralText(doc.specialty);
+  const cleanAddress = cleanGeneralText(doc.address);
+  const cleanMobile = cleanGeneralText(doc.mobile);
+  const cleanHomeTel = cleanGeneralText(doc.home_tel);
 
   return `
     <div class="grid-item ${movedClass}">
       <div class="top-row">
         <div class="left-actions">
-          <div class="code-box ${getModClass('doc_code')}">${escapeHTML(doc.doc_code || '')}</div>
+          <div class="code-box ${getModClass('doc_code')}">${escapeHTML(cleanGeneralText(doc.doc_code))}</div>
         </div>
         <div class="boxes-wrapper">
           <div class="box ${getModClass('old_stats')}">${doc.old_stats !== undefined && doc.old_stats !== null ? escapeHTML(String(doc.old_stats)) : ''}</div>
@@ -231,15 +236,15 @@ function renderDoctorCardHTML(doc) {
         </div>
       </div>
       <div class="doc-info">
-        <div class="doc-name ${getModClass('name')}">${escapeHTML(doc.name || '')}</div>
-        <div class="${getModClass('specialty')}">${escapeHTML(doc.specialty || '')}</div>
-        <div class="${getModClass('address')}">${escapeHTML(doc.address || '')}</div>
-        ${doc.is_moved && doc.moved_from ? `<div class="moved-text note-moved">كان في: ${escapeHTML(doc.moved_from)}</div>` : ''}
+        <div class="doc-name ${getModClass('name')}">${escapeHTML(cleanName)}</div>
+        <div class="${getModClass('specialty')}">${escapeHTML(cleanSpecialty)}</div>
+        <div class="${getModClass('address')}">${escapeHTML(cleanAddress)}</div>
+        ${doc.is_moved && doc.moved_from ? `<div class="moved-text note-moved">كان في: ${escapeHTML(cleanGeneralText(doc.moved_from))}</div>` : ''}
         ${doc.merged_codes && doc.merged_codes.length ? `<div class="moved-text note-merged">+ مدمج مع: ${escapeHTML(doc.merged_codes.join(', '))}</div>` : ''}
       </div>
       <div class="bottom-row">
-        <div class="${getModClass('mobile')}">${escapeHTML(doc.mobile || '')}</div>
-        <div class="${getModClass('home_tel')}">${escapeHTML(doc.home_tel || '')}</div>
+        <div class="${getModClass('mobile')}">${escapeHTML(cleanMobile)}</div>
+        <div class="${getModClass('home_tel')}">${escapeHTML(cleanHomeTel)}</div>
       </div>
     </div>
   `;

@@ -5,6 +5,7 @@ import {
   useToggleInactiveMutation,
   useDeleteDoctorMutation,
 } from '../../hooks/useDoctorQueries';
+import { cleanDoctorName, cleanGeneralText } from '../../services/doctorService';
 import {
   Maximize2,
   ArrowRightLeft,
@@ -206,17 +207,21 @@ function DoctorCard({ doc, index }) {
               onBlur={(e) => handleBlur('name', e)}
               title="اسم الطبيب (انقر للتعديل)"
             >
-              {doc.name || ''}
+              {cleanDoctorName(doc.name) || doc.name || ''}
             </div>
 
             {/* Specialty & Address */}
             <div className="flex flex-col gap-1 text-right">
               {/* Specialty */}
               <div
-                className={`inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2.5 py-1 rounded-md w-fit cursor-text hover:border-blue-300 transition-colors ${getModClass('specialty')}`}
+                className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
+                  cleanGeneralText(doc.specialty)
+                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2.5 py-1 rounded-md w-fit cursor-text hover:border-blue-300 ${getModClass('specialty')}`
+                    : `text-slate-400 px-1.5 py-0.5 rounded cursor-text hover:bg-slate-100/60 w-fit ${getModClass('specialty')}`
+                }`}
                 title="التخصص (انقر للتعديل)"
               >
-                <Stethoscope className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 select-none" />
+                <Stethoscope className={`w-3.5 h-3.5 flex-shrink-0 select-none ${cleanGeneralText(doc.specialty) ? 'text-blue-500' : 'text-slate-400 opacity-60'}`} />
                 <span
                   contentEditable={true}
                   suppressContentEditableWarning={true}
@@ -224,7 +229,7 @@ function DoctorCard({ doc, index }) {
                   className="outline-none min-w-[30px]"
                   onBlur={(e) => handleBlur('specialty', e)}
                 >
-                  {doc.specialty || ''}
+                  {cleanGeneralText(doc.specialty)}
                 </span>
               </div>
 
@@ -241,7 +246,7 @@ function DoctorCard({ doc, index }) {
                   className="outline-none min-w-[50px] flex-1"
                   onBlur={(e) => handleBlur('address', e)}
                 >
-                  {doc.address || ''}
+                  {cleanGeneralText(doc.address)}
                 </span>
               </div>
 
@@ -389,17 +394,17 @@ function DoctorCard({ doc, index }) {
         {/* Doctor Information */}
         <div className="doc-info">
           <div className={`doc-name ${getModClass('name')}`}>
-            {doc.name || ''}
+            {cleanDoctorName(doc.name) || doc.name || ''}
           </div>
           <div className={getModClass('specialty')}>
-            {doc.specialty || ''}
+            {cleanGeneralText(doc.specialty)}
           </div>
           <div className={getModClass('address')}>
-            {doc.address || ''}
+            {cleanGeneralText(doc.address)}
           </div>
           {doc.is_moved && doc.moved_from && (
             <div className="moved-text note-moved">
-              كان في: {doc.moved_from}
+              كان في: {cleanGeneralText(doc.moved_from)}
             </div>
           )}
           {doc.merged_codes && doc.merged_codes.length > 0 && (
@@ -412,10 +417,10 @@ function DoctorCard({ doc, index }) {
         {/* Bottom Contacts */}
         <div className="bottom-row">
           <div className={getModClass('mobile')}>
-            {doc.mobile || ''}
+            {cleanGeneralText(doc.mobile)}
           </div>
           <div className={getModClass('home_tel')}>
-            {doc.home_tel || ''}
+            {cleanGeneralText(doc.home_tel)}
           </div>
         </div>
       </div>

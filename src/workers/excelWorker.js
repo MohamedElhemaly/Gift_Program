@@ -47,21 +47,30 @@ function getColumnMapping(dataArray) {
 }
 
 /**
+/**
  * Sanitizes dirty Excel strings:
- * Removes consecutive % signs (%%%المروة%%% -> المروة), asterisks (***د/ فلان*** -> د/ فلان),
- * and normalizes excess whitespace.
+ * Replaces % and noise symbols (*, #, _, ~, ^) with space, and normalizes excess whitespace.
  */
 function sanitizeString(val) {
   if (val === undefined || val === null) return '';
-  let str = String(val);
-  // Remove consecutive % signs or patterns like %%%Text%%%
-  str = str.replace(/%+[\s\S]*?%+/g, (match) => match.replace(/%/g, ''));
-  str = str.replace(/%+/g, '');
-  // Remove asterisks
-  str = str.replace(/\*+/g, '');
-  // Normalize whitespace and trim
-  str = str.replace(/\s+/g, ' ').trim();
-  return str;
+  return String(val)
+    .replace(/[%*#_~^]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Sanitizes doctor name and ensures proper clean prefix
+ */
+function sanitizeDoctorName(val) {
+  if (val === undefined || val === null) return '';
+  const str = sanitizeString(val);
+  const withoutPrefix = str
+    .replace(/^أ\.?\s*د\s*\/?:?\s*/i, '')
+    .replace(/^د\s*\/?:?\s*/i, '')
+    .trim();
+  if (!withoutPrefix) return '';
+  return 'أ.د/ ' + withoutPrefix;
 }
 
 function parseBuffer(buffer) {
@@ -105,10 +114,7 @@ self.onmessage = async (e) => {
           if (idCode === '') return;
 
           if (!doctorsMap[idCode]) {
-            let n = sanitizeString(row[mapConf.name] || '');
-            if (n && !n.includes('أ.د/')) {
-              n = 'أ.د/ ' + n;
-            }
+            let n = sanitizeDoctorName(row[mapConf.name] || '');
 
             const gvr = sanitizeString(row[mapConf.gvr] || '');
             const city = sanitizeString(row[mapConf.city] || '');

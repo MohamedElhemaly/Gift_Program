@@ -12,6 +12,28 @@ function safeSaveLocalStorage(key, data) {
   }
 }
 
+export function cleanDoctorName(val) {
+  if (!val) return '';
+  let str = String(val)
+    .replace(/[%*#_~^]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const withoutPrefix = str
+    .replace(/^أ\.?\s*د\s*\/?:?\s*/i, '')
+    .replace(/^د\s*\/?:?\s*/i, '')
+    .trim();
+  if (!withoutPrefix) return '';
+  return 'أ.د/ ' + withoutPrefix;
+}
+
+export function cleanGeneralText(val) {
+  if (!val) return '';
+  return String(val)
+    .replace(/[%*#_~^]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export const doctorService = {
   /**
    * Log an event in the audit_logs table
@@ -136,20 +158,20 @@ export const doctorService = {
       // Transform joined data to flat doctor structure matching the original UI model
       const transformed = allRecords.map((doc) => ({
         id: doc.id,
-        doc_code: doc.doc_code || '',
-        name: doc.name || '',
-        specialty: doc.specialty || '',
-        address: doc.address || '',
-        mobile: doc.mobile || '',
-        home_tel: doc.home_tel || '',
+        doc_code: cleanGeneralText(doc.doc_code),
+        name: cleanDoctorName(doc.name),
+        specialty: cleanGeneralText(doc.specialty),
+        address: cleanGeneralText(doc.address),
+        mobile: cleanGeneralText(doc.mobile),
+        home_tel: cleanGeneralText(doc.home_tel),
         is_inactive: Boolean(doc.is_inactive),
         is_moved: Boolean(doc.is_moved),
-        moved_from: doc.moved_from || '',
+        moved_from: cleanGeneralText(doc.moved_from),
         merged_codes: doc.merged_codes || [],
         location_id: doc.location?.id || null,
-        pageGvr: doc.location?.governorate || '',
-        pageCity: doc.location?.city || '',
-        pageRegion: doc.location?.region || '',
+        pageGvr: cleanGeneralText(doc.location?.governorate),
+        pageCity: cleanGeneralText(doc.location?.city),
+        pageRegion: cleanGeneralText(doc.location?.region),
         old_stats: doc.statistics?.[0]?.old_stats ?? doc.statistics?.old_stats ?? '',
         new_stats: doc.statistics?.[0]?.new_stats ?? doc.statistics?.new_stats ?? '',
       }));
@@ -275,12 +297,12 @@ export const doctorService = {
             : (locationMap.get(key) || null);
 
           const rec = {
-            doc_code: code,
-            name: hasManual ? existing.name : (d.name || ''),
-            specialty: hasManual ? existing.specialty : (d.specialty || ''),
-            address: hasManual ? existing.address : (d.address || ''),
-            mobile: hasManual ? existing.mobile : (d.mobile || ''),
-            home_tel: hasManual ? existing.home_tel : (d.home_tel || ''),
+            doc_code: cleanGeneralText(code),
+            name: hasManual ? cleanDoctorName(existing.name) : cleanDoctorName(d.name),
+            specialty: hasManual ? cleanGeneralText(existing.specialty) : cleanGeneralText(d.specialty),
+            address: hasManual ? cleanGeneralText(existing.address) : cleanGeneralText(d.address),
+            mobile: hasManual ? cleanGeneralText(existing.mobile) : cleanGeneralText(d.mobile),
+            home_tel: hasManual ? cleanGeneralText(existing.home_tel) : cleanGeneralText(d.home_tel),
             is_inactive: existing ? Boolean(existing.is_inactive) : Boolean(d.is_inactive),
             location_id: finalLocationId,
           };

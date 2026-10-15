@@ -5,6 +5,7 @@ import {
   useToggleInactiveMutation,
   useDeleteDoctorMutation,
 } from '../../hooks/useDoctorQueries';
+import { cleanDoctorName, cleanGeneralText } from '../../services/doctorService';
 import {
   Minimize2,
   X,
@@ -53,13 +54,19 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   const doc = displayedDoctors[index];
 
   const handleFieldChange = (field, value) => {
-    updateInlineItem(index, field, value);
+    let cleanVal = value;
+    if (field === 'name') {
+      cleanVal = cleanDoctorName(value);
+    } else if (field !== 'old_stats' && field !== 'new_stats' && field !== 'counter') {
+      cleanVal = cleanGeneralText(value);
+    }
+    updateInlineItem(index, field, cleanVal);
     if (doc.id || doc.doc_code) {
       updateFieldMutation.mutate({
         id: doc.id,
         docCode: doc.doc_code,
         field,
-        value,
+        value: cleanVal,
       });
     }
   };
@@ -72,7 +79,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   };
 
   const handleDelete = () => {
-    const docName = doc.name || doc.doc_code || 'هذا الطبيب';
+    const docName = cleanDoctorName(doc.name) || doc.name || doc.doc_code || 'هذا الطبيب';
     if (!window.confirm(`هل أنت متأكد من حذف الطبيب: "${docName}" نهائياً من قاعدة البيانات؟`)) {
       return;
     }
@@ -104,10 +111,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
             </span>
             <div>
               <h2 className="text-lg font-bold text-slate-900 leading-tight">
-                {doc.name || 'طبيب بدون اسم (خانة فارغة)'}
+                {cleanDoctorName(doc.name) || doc.name || 'طبيب بدون اسم (خانة فارغة)'}
               </h2>
               <p className="text-xs text-slate-500 font-mono">
-                كود الطبيب: {doc.doc_code || 'غير محدد'} | صفحة: {doc.pageGvr || 'بدون محافظة'} - {doc.pageCity || ''}
+                كود الطبيب: {cleanGeneralText(doc.doc_code) || 'غير محدد'} | صفحة: {cleanGeneralText(doc.pageGvr) || 'بدون محافظة'} - {cleanGeneralText(doc.pageCity) || ''}
               </p>
             </div>
           </div>

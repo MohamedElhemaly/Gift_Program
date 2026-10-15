@@ -244,16 +244,16 @@ export const doctorService = {
         const chunk = doctorsList.slice(i, i + BATCH_SIZE);
         const currentCount = Math.min(i + BATCH_SIZE, doctorsList.length);
         if (onProgress) {
-          onProgress(`جاري حفظ بيانات الأطباء (${currentCount} من ${doctorsList.length})...`);
+          onProgress(`جاري حفظ وتحديث بيانات الأطباء (${currentCount} من ${doctorsList.length})...`, currentCount, doctorsList.length);
         }
 
-        // Query existing doctors in this chunk to preserve manual location/moves/merges
+        // Query existing doctors in this chunk to preserve manual location/moves/merges/edits
         const chunkCodes = chunk.map((d) => String(d.doc_code).trim());
         let existingMap = new Map();
         try {
           const { data: existingRecords } = await supabase
             .from('doctors')
-            .select('doc_code, location_id, is_moved, moved_from, merged_codes, is_inactive')
+            .select('doc_code, name, specialty, address, mobile, home_tel, location_id, is_moved, moved_from, merged_codes, is_inactive, has_manual_edits')
             .in('doc_code', chunkCodes);
           if (existingRecords) {
             existingRecords.forEach((r) => existingMap.set(r.doc_code, r));
@@ -267,18 +267,20 @@ export const doctorService = {
           const existing = existingMap.get(code);
           const key = `${(d.pageGvr || '').trim()}:::${(d.pageCity || '').trim()}:::${(d.pageRegion || '').trim()}`;
           
-          // If doctor already exists and was moved manually, preserve their location
-          const finalLocationId = (existing && existing.is_moved && existing.location_id) 
+          // If doctor already exists and has manual edits or was moved, STRICTLY PRESERVE all manual changes!
+          const hasManual = existing && (Boolean(existing.has_manual_edits) || Boolean(existing.is_moved));
+
+          const finalLocationId = (hasManual && existing.location_id) 
             ? existing.location_id 
             : (locationMap.get(key) || null);
 
           const rec = {
             doc_code: code,
-            name: d.name || '',
-            specialty: d.specialty || '',
-            address: d.address || '',
-            mobile: d.mobile || '',
-            home_tel: d.home_tel || '',
+            name: hasManual ? existing.name : (d.name || ''),
+            specialty: hasManual ? existing.specialty : (d.specialty || ''),
+            address: hasManual ? existing.address : (d.address || ''),
+            mobile: hasManual ? existing.mobile : (d.mobile || ''),
+            home_tel: hasManual ? existing.home_tel : (d.home_tel || ''),
             is_inactive: existing ? Boolean(existing.is_inactive) : Boolean(d.is_inactive),
             location_id: finalLocationId,
           };
@@ -286,6 +288,7 @@ export const doctorService = {
             rec.is_moved = existing ? Boolean(existing.is_moved) : Boolean(d.is_moved);
             rec.moved_from = existing ? (existing.moved_from || '') : (d.moved_from || '');
             rec.merged_codes = existing?.merged_codes?.length ? existing.merged_codes : (d.merged_codes || []);
+            rec.has_manual_edits = existing ? Boolean(existing.has_manual_edits) : false;
           }
           return rec;
         });
@@ -332,7 +335,7 @@ export const doctorService = {
           const statsChunk = statsToUpsert.slice(i, i + BATCH_SIZE);
           const currentStatsCount = Math.min(i + BATCH_SIZE, statsToUpsert.length);
           if (onProgress) {
-            onProgress(`جاري حفظ إحصائيات الحالات (${currentStatsCount} من ${statsToUpsert.length})...`);
+            onProgress(`جاري حفظ إحصائيات الحالات (${currentStatsCount} من ${statsToUpsert.length})...`, currentStatsCount, statsToUpsert.length);
           }
           const { error: statsErr } = await supabase
             .from('statistics')

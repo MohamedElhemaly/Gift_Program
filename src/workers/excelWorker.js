@@ -46,6 +46,24 @@ function getColumnMapping(dataArray) {
   return map;
 }
 
+/**
+ * Sanitizes dirty Excel strings:
+ * Removes consecutive % signs (%%%المروة%%% -> المروة), asterisks (***د/ فلان*** -> د/ فلان),
+ * and normalizes excess whitespace.
+ */
+function sanitizeString(val) {
+  if (val === undefined || val === null) return '';
+  let str = String(val);
+  // Remove consecutive % signs or patterns like %%%Text%%%
+  str = str.replace(/%+[\s\S]*?%+/g, (match) => match.replace(/%/g, ''));
+  str = str.replace(/%+/g, '');
+  // Remove asterisks
+  str = str.replace(/\*+/g, '');
+  // Normalize whitespace and trim
+  str = str.replace(/\s+/g, ' ').trim();
+  return str;
+}
+
 function parseBuffer(buffer) {
   if (!buffer) return [];
   const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
@@ -70,7 +88,7 @@ self.onmessage = async (e) => {
         throw new Error('لم يتم العثور على أي بيانات داخل الملفات المرفوعة!');
       }
 
-      self.postMessage({ id, type: 'PROGRESS', message: 'جاري مطابقة الأعمدة ودمج الإحصائيات...' });
+      self.postMessage({ id, type: 'PROGRESS', message: 'جاري مطابقة الأعمدة وتطهير البيانات ودمج الإحصائيات...' });
       const docsMapConf = getColumnMapping(docsData);
       const oldMapConf = getColumnMapping(oldData);
       const newMapConf = getColumnMapping(newData);
@@ -83,32 +101,32 @@ self.onmessage = async (e) => {
         dataset.forEach((row) => {
           let idCode = row[mapConf.code];
           if (idCode === undefined || idCode === null) return;
-          idCode = String(idCode).trim();
+          idCode = sanitizeString(idCode);
           if (idCode === '') return;
 
           if (!doctorsMap[idCode]) {
-            let n = row[mapConf.name] || '';
-            if (n && !String(n).includes('أ.د/')) {
+            let n = sanitizeString(row[mapConf.name] || '');
+            if (n && !n.includes('أ.د/')) {
               n = 'أ.د/ ' + n;
             }
 
-            const gvr = String(row[mapConf.gvr] || '').trim();
-            const city = String(row[mapConf.city] || '').trim();
-            const region = String(row[mapConf.region] || '').trim();
+            const gvr = sanitizeString(row[mapConf.gvr] || '');
+            const city = sanitizeString(row[mapConf.city] || '');
+            const region = sanitizeString(row[mapConf.region] || '');
 
             doctorsMap[idCode] = {
               doc_code: idCode,
               name: n,
-              specialty: String(row[mapConf.specialty] || '').trim(),
-              address: String(row[mapConf.address] || '').trim(),
+              specialty: sanitizeString(row[mapConf.specialty] || ''),
+              address: sanitizeString(row[mapConf.address] || ''),
               gvr,
               city,
               region,
               pageGvr: gvr,
               pageCity: city,
               pageRegion: region,
-              mobile: String(row[mapConf.mobile] || '').trim(),
-              home_tel: String(row[mapConf.home_tel] || '').trim(),
+              mobile: sanitizeString(row[mapConf.mobile] || ''),
+              home_tel: sanitizeString(row[mapConf.home_tel] || ''),
               old_stats: '',
               new_stats: '',
               is_moved: false,
@@ -130,10 +148,11 @@ self.onmessage = async (e) => {
 
           const countVal = row[countKey];
           if (countVal !== undefined && countVal !== null) {
+            const parsedCount = parseInt(String(countVal).trim(), 10) || 0;
             if (sheetType === 'docs' || sheetType === 'old') {
-              doctorsMap[idCode].old_stats = countVal;
+              doctorsMap[idCode].old_stats = parsedCount;
             } else {
-              doctorsMap[idCode].new_stats = countVal;
+              doctorsMap[idCode].new_stats = parsedCount;
             }
           }
         });
@@ -162,11 +181,11 @@ self.onmessage = async (e) => {
       oldData.forEach((r) => {
         const code = r[oldMapConf.code];
         if (code) {
-          const c = String(code).trim();
+          const c = sanitizeString(code);
           const val = r[oldMapConf.count_old] !== undefined ? r[oldMapConf.count_old] : r[oldMapConf.count_general];
-          if (val !== undefined) {
+          if (val !== undefined && val !== null) {
             if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
-            updatesMap[c].old_stats = val;
+            updatesMap[c].old_stats = parseInt(String(val).trim(), 10) || 0;
           }
         }
       });
@@ -174,11 +193,11 @@ self.onmessage = async (e) => {
       newData.forEach((r) => {
         const code = r[newMapConf.code];
         if (code) {
-          const c = String(code).trim();
+          const c = sanitizeString(code);
           const val = r[newMapConf.count_new] !== undefined ? r[newMapConf.count_new] : r[newMapConf.count_general];
-          if (val !== undefined) {
+          if (val !== undefined && val !== null) {
             if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
-            updatesMap[c].new_stats = val;
+            updatesMap[c].new_stats = parseInt(String(val).trim(), 10) || 0;
           }
         }
       });

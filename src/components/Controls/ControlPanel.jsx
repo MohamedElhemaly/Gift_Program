@@ -1,11 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
-import { doctorService } from '../../services/doctorService';
-import { parseAndMergeSheets, parseStatsOnly } from '../../lib/excelParser';
-import { queryClient } from '../../lib/queryClient';
-import { QUERY_KEYS } from '../../hooks/useDoctorQueries';
-import toast from 'react-hot-toast';
 import BlankPageModal from '../Modals/BlankPageModal';
+import ExcelUploadZone from './ExcelUploadZone';
 import {
   FileSpreadsheet,
   RefreshCw,
@@ -46,7 +42,6 @@ export default function ControlPanel({ onPrint }) {
     setDistributionMode,
   } = useDoctorStore();
 
-  const [loadingAction, setLoadingAction] = useState(false);
   const [pageRange, setPageRange] = useState('الكل');
   const [isBlankPageModalOpen, setIsBlankPageModalOpen] = useState(false);
   const [isExcelOpen, setIsExcelOpen] = useState(false);
@@ -65,14 +60,6 @@ export default function ControlPanel({ onPrint }) {
     return () => clearTimeout(timer);
   }, [localSearch]);
 
-  // File Input Refs
-  const docsFileRef = useRef(null);
-  const oldFileRef = useRef(null);
-  const newFileRef = useRef(null);
-
-  const updateOldFileRef = useRef(null);
-  const updateNewFileRef = useRef(null);
-
   // Get dynamic unique options for dropdowns
   const { governorates, cities, regions, specialties } = getUniqueFilterOptions();
 
@@ -85,133 +72,6 @@ export default function ControlPanel({ onPrint }) {
     (d) => d.name || d.doc_code
   ).length;
   const currentTotalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
-
-  /**
-   * 1. Generate Report from Excel (Upsert to DB via Web Worker)
-   */
-  const handleGenerateReport = async () => {
-    const docsFile = docsFileRef.current?.files?.[0];
-    const oldFile = oldFileRef.current?.files?.[0];
-    const newFile = newFileRef.current?.files?.[0];
-
-    if (!docsFile && !oldFile && !newFile) {
-      toast.error('برجاء رفع شيت واحد على الأقل!');
-      return;
-    }
-
-    setLoadingAction(true);
-    setStatus('جاري استخراج البيانات في خلفية النظام (Web Worker)...');
-
-    try {
-      // 1. Non-blocking Web Worker parsing
-      const mergedList = await parseAndMergeSheets({
-        docsFile,
-        oldFile,
-        newFile,
-        onProgress: (msg) => setStatus(msg),
-      });
-
-      // 2. Render IMMEDIATELY on screen - ZERO DELAY!
-      rebuildData(mergedList);
-      try {
-        localStorage.setItem('gift_program_doctors_data', JSON.stringify(mergedList));
-      } catch (e) {
-        // quota exceeded for massive datasets, TanStack Query manages in-memory caching
-      }
-      queryClient.setQueryData(QUERY_KEYS.DOCTORS, mergedList);
-      toast.success(`تم استخراج ${mergedList.length} طبيب وبناء التقرير بنجاح!`);
-      setStatus(`تم استخراج ${mergedList.length} طبيب! جاري المزامنة مع قاعدة البيانات في السحابة...`);
-
-      // 3. Upsert to Supabase in background
-      doctorService.upsertDoctorsBatch(mergedList, (msg) => setStatus(msg))
-        .then((result) => {
-          setStatus(`تم تأكيد حفظ ${result.count} طبيب بنجاح في قاعدة البيانات.`);
-          toast.success(`تم تأكيد مزامنة ${result.count} طبيب مع قاعدة البيانات.`);
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
-        })
-        .catch((err) => {
-          console.warn('Sync notice:', err);
-        });
-
-    } catch (err) {
-      console.error(err);
-      toast.error('حدث خطأ أثناء قراءة الملف: ' + err.message);
-      setStatus('حدث خطأ أثناء قراءة الملف: ' + err.message, true);
-    } finally {
-      setLoadingAction(false);
-    }
-  };
-
-  /**
-   * 2. Update Stats Only (Excel via Web Worker)
-   */
-  const handleUpdateStatsOnly = async () => {
-    if (displayedDoctors.length === 0) {
-      toast.error('لا توجد بيانات حالية! ارفع شيت الأطباء أولاً.');
-      return;
-    }
-
-    const oldFile = updateOldFileRef.current?.files?.[0];
-    const newFile = updateNewFileRef.current?.files?.[0];
-
-    if (!oldFile && !newFile) {
-      toast.error('برجاء رفع شيت القديم أو الجديد للتحديث!');
-      return;
-    }
-
-    setLoadingAction(true);
-    setStatus('جاري تحديث الحالات عبر الـ Web Worker...');
-
-    try {
-      const statsList = await parseStatsOnly({
-        oldFile,
-        newFile,
-        onProgress: (msg) => setStatus(msg),
-      });
-
-      // Apply updates in local store immediately
-      const list = [...displayedDoctors];
-      let counter = 0;
-      statsList.forEach((st) => {
-        const found = list.find(
-          (d) => String(d.doc_code).trim() === String(st.doc_code).trim()
-        );
-        if (found) {
-          if (st.old_stats !== undefined && found.old_stats !== st.old_stats) {
-            found.old_stats = st.old_stats;
-            found.old_stats_updated = true;
-            found.old_stats_modified = false;
-            counter++;
-          }
-          if (st.new_stats !== undefined && found.new_stats !== st.new_stats) {
-            found.new_stats = st.new_stats;
-            found.new_stats_updated = true;
-            found.new_stats_modified = false;
-            counter++;
-          }
-        }
-      });
-
-      rebuildData(list);
-      queryClient.setQueryData(QUERY_KEYS.DOCTORS, list);
-      toast.success(`تم تحديث إحصائيات ${counter} طبيب فوراً!`);
-      setStatus(`تم تحديث ${counter} حالة على الشاشة فوراً! جاري المزامنة في السحابة...`);
-
-      // Sync to Supabase in background
-      doctorService.updateStatisticsOnlyBatch(statsList, (msg) => setStatus(msg))
-        .then((result) => {
-          setStatus(`تم تأكيد تحديث ${result.count} حالة بنجاح في قاعدة البيانات.`);
-          toast.success(`تم تأكيد حفظ الحالات في قاعدة البيانات.`);
-          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
-        });
-    } catch (err) {
-      console.error(err);
-      toast.error('خطأ في التحديث: ' + err.message);
-      setStatus('خطأ في التحديث: ' + err.message, true);
-    } finally {
-      setLoadingAction(false);
-    }
-  };
 
   const hasData = displayedDoctors.length > 0;
 
@@ -456,7 +316,7 @@ export default function ControlPanel({ onPrint }) {
         </div>
       </div>
 
-      {/* 📁 2. قسم استيراد وتحديث شيتات الإكسيل (طي / فتح اختياري) */}
+      {/* 📁 2. قسم استيراد وتحديث شيتات الإكسيل (Drag & Drop, Smart Upsert & Data Sanitization) */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
         <div className="flex items-center justify-between">
           <button
@@ -465,110 +325,16 @@ export default function ControlPanel({ onPrint }) {
             className="flex items-center gap-2 text-sm font-bold text-[#007bff] hover:text-[#0056b3] cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>استيراد وتحديث شيتات الإكسيل (Excel Sync / Upsert)</span>
+            <span>استيراد وتحديث شيتات الإكسيل (Excel Drag & Drop / Smart Upsert)</span>
             <span className="text-[11px] text-gray-400 font-normal">
-              {isExcelOpen ? '▲ إخفاء' : '▼ إظهار أدوات الاستيراد'}
+              {isExcelOpen ? '▲ إخفاء أدوات الاستيراد' : '▼ إظهار أدوات السحب والإفلات والمزامنة السحابية'}
             </span>
           </button>
         </div>
 
         {isExcelOpen && (
-          <div className="mt-4 pt-3 border-t border-slate-100 space-y-4">
-            {/* استيراد تقرير كامل */}
-            <div>
-              <h4 className="text-xs font-bold text-gray-700 mb-2">
-                1. استيراد أطباء جدد أو شيت كامل (Upsert):
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    شيت الدكاترة:
-                  </label>
-                  <input
-                    type="file"
-                    ref={docsFileRef}
-                    accept=".xlsx, .xls"
-                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
-                  />
-                </div>
-
-                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    شيت القديم:
-                  </label>
-                  <input
-                    type="file"
-                    ref={oldFileRef}
-                    accept=".xlsx, .xls"
-                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
-                  />
-                </div>
-
-                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    شيت الجديد:
-                  </label>
-                  <input
-                    type="file"
-                    ref={newFileRef}
-                    accept=".xlsx, .xls"
-                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={loadingAction}
-                onClick={handleGenerateReport}
-                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-[#007bff] hover:bg-[#0056b3] text-xs shadow-xs disabled:opacity-50"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>{loadingAction ? 'جاري المعالجة والمزامنة...' : 'مزامنة وحفظ الشيت في السحابة'}</span>
-              </button>
-            </div>
-
-            {/* تحديث أرقام الحالات فقط */}
-            <div className="pt-3 border-t border-slate-100">
-              <h4 className="text-xs font-bold text-gray-700 mb-2">
-                2. تحديث أرقام الحالات فقط (بدون تعديل العناوين):
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    شيت القديم:
-                  </label>
-                  <input
-                    type="file"
-                    ref={updateOldFileRef}
-                    accept=".xlsx, .xls"
-                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
-                  />
-                </div>
-
-                <div className="border border-slate-200 p-2.5 rounded-lg bg-slate-50">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    شيت الجديد:
-                  </label>
-                  <input
-                    type="file"
-                    ref={updateNewFileRef}
-                    accept=".xlsx, .xls"
-                    className="text-xs text-gray-600 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border file:border-gray-300 file:bg-white file:text-xs file:font-semibold cursor-pointer w-full"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={loadingAction}
-                onClick={handleUpdateStatsOnly}
-                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-slate-700 hover:bg-slate-800 text-xs shadow-xs disabled:opacity-50"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>تحديث الحالات فقط</span>
-              </button>
-            </div>
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <ExcelUploadZone onClose={() => setIsExcelOpen(false)} />
           </div>
         )}
       </div>

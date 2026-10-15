@@ -351,11 +351,13 @@ body {
     border-radius: 0 !important;
     width: 210mm !important;
     height: 297mm !important;
+    max-height: 297mm !important;
     padding: 10mm !important;
     page-break-after: always !important;
     page-break-inside: avoid !important;
     overflow: hidden !important;
     background: white !important;
+    box-sizing: border-box !important;
   }
 
   .header {
@@ -363,6 +365,8 @@ body {
     justify-content: space-between !important;
     align-items: center !important;
     height: 10mm !important;
+    max-height: 10mm !important;
+    overflow: hidden !important;
     font-size: 18px !important;
     font-weight: bold !important;
     margin-bottom: 10px !important;
@@ -370,19 +374,23 @@ body {
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
+    box-sizing: border-box !important;
   }
 
   .grid-container {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    grid-template-rows: repeat(7, 1fr) !important;
+    grid-template-rows: repeat(7, calc(255mm / 7)) !important;
     height: 255mm !important;
+    max-height: 255mm !important;
+    overflow: hidden !important;
     border-top: 2px solid black !important;
     border-right: 2px solid black !important;
     border-bottom: none !important;
     border-left: none !important;
     background: white !important;
     gap: 0 !important;
+    box-sizing: border-box !important;
   }
 
   .grid-item {
@@ -391,9 +399,40 @@ body {
     border-left: 2px solid black !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    padding: 6px !important;
+    padding: 5px 6px !important;
     margin: 0 !important;
     background: white !important;
+    height: calc(255mm / 7) !important;
+    max-height: calc(255mm / 7) !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  .doc-info {
+    overflow: hidden !important;
+    max-height: calc(255mm / 7 - 42px) !important;
+  }
+
+  .doc-name {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 13.5px !important;
+    line-height: 1.2 !important;
+  }
+
+  .doc-info div {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.25 !important;
+  }
+
+  .bottom-row {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 11px !important;
   }
 
   .box {

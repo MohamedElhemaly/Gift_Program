@@ -299,15 +299,21 @@ export const doctorService = {
             ? existing.location_id 
             : (locationMap.get(key) || null);
 
+          const inName = cleanDoctorName(d.name);
+          const inSpec = cleanGeneralText(d.specialty || d.spec || d.doctor_spec);
+          const inAddr = cleanGeneralText(d.address || d.clinic_address || d.addr);
+          const inMob = cleanGeneralText(d.mobile || d.phone || d.mobile_no);
+          const inHome = cleanGeneralText(d.home_tel || d.tel || d.landline);
+
           const rec = {
             doc_code: cleanGeneralText(code),
-            name: hasManual ? cleanDoctorName(existing.name) : cleanDoctorName(d.name),
-            specialty: hasManual ? cleanGeneralText(existing.specialty) : cleanGeneralText(d.specialty),
-            address: hasManual ? cleanGeneralText(existing.address) : cleanGeneralText(d.address),
-            mobile: hasManual ? cleanGeneralText(existing.mobile) : cleanGeneralText(d.mobile),
-            home_tel: hasManual ? cleanGeneralText(existing.home_tel) : cleanGeneralText(d.home_tel),
+            name: hasManual ? cleanDoctorName(existing.name) : (inName || (existing ? cleanDoctorName(existing.name) : '')),
+            specialty: hasManual ? cleanGeneralText(existing.specialty) : (inSpec || (existing ? cleanGeneralText(existing.specialty) : '')),
+            address: hasManual ? cleanGeneralText(existing.address) : (inAddr || (existing ? cleanGeneralText(existing.address) : '')),
+            mobile: hasManual ? cleanGeneralText(existing.mobile) : (inMob || (existing ? cleanGeneralText(existing.mobile) : '')),
+            home_tel: hasManual ? cleanGeneralText(existing.home_tel) : (inHome || (existing ? cleanGeneralText(existing.home_tel) : '')),
             is_inactive: existing ? Boolean(existing.is_inactive) : Boolean(d.is_inactive),
-            location_id: finalLocationId,
+            location_id: finalLocationId || (existing?.location_id || null),
           };
           if (withExtended) {
             rec.is_moved = existing ? Boolean(existing.is_moved) : Boolean(d.is_moved);

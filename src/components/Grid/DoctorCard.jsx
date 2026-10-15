@@ -96,6 +96,11 @@ function DoctorCard({ doc, index }) {
     ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md'
     : 'bg-slate-50/50 border-dashed border-slate-300 hover:bg-white hover:border-blue-300';
 
+  const specVal = cleanGeneralText(doc.specialty || doc.spec || doc.doctor_spec || '');
+  const addrVal = cleanGeneralText(doc.address || doc.clinic_address || doc.addr || '');
+  const mobileVal = cleanGeneralText(doc.mobile || doc.phone || doc.mobile_no || '');
+  const homeTelVal = cleanGeneralText(doc.home_tel || doc.tel || doc.landline || '');
+
   return (
     <div
       className={`grid-item relative transition-all duration-200 p-3 rounded-xl border
@@ -209,42 +214,42 @@ function DoctorCard({ doc, index }) {
             </div>
 
             {/* Specialty & Address */}
-            <div className="flex flex-col gap-1 text-right">
+            <div className="flex flex-col gap-1 text-right max-w-full">
               {/* Specialty */}
               <div
-                className={`inline-flex items-center gap-1.5 text-xs transition-colors ${
-                  cleanGeneralText(doc.specialty)
-                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2.5 py-1 rounded-md w-fit cursor-text hover:border-blue-300 ${getModClass('specialty')}`
-                    : `text-slate-400 px-1.5 py-0.5 rounded cursor-text hover:bg-slate-100/60 w-fit ${getModClass('specialty')}`
+                className={`inline-flex items-center gap-1.5 text-xs max-w-full transition-colors ${
+                  specVal
+                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md w-fit cursor-text hover:border-blue-300 ${getModClass('specialty')}`
+                    : `text-slate-400 px-1 py-0.5 rounded cursor-text hover:bg-slate-100/60 w-fit ${getModClass('specialty')}`
                 }`}
-                title="التخصص (انقر للتعديل)"
+                title={`التخصص: ${specVal || 'انقر للتعديل'}`}
               >
-                <Stethoscope className={`w-3.5 h-3.5 flex-shrink-0 select-none ${cleanGeneralText(doc.specialty) ? 'text-blue-500' : 'text-slate-400 opacity-60'}`} />
+                <Stethoscope className={`w-3.5 h-3.5 flex-shrink-0 select-none ${specVal ? 'text-blue-500' : 'text-slate-400 opacity-60'}`} />
                 <span
                   contentEditable={true}
                   suppressContentEditableWarning={true}
                   data-placeholder="التخصص..."
-                  className="outline-none min-w-[30px]"
+                  className="outline-none min-w-[30px] truncate max-w-[200px] inline-block align-middle"
                   onBlur={(e) => handleBlur('specialty', e)}
                 >
-                  {cleanGeneralText(doc.specialty)}
+                  {specVal}
                 </span>
               </div>
 
               {/* Address */}
               <div
-                className={`text-xs text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100/70 cursor-text transition-colors flex items-start gap-1 leading-relaxed ${getModClass('address')}`}
-                title="العنوان ومقر العيادة (انقر للتعديل)"
+                className={`text-xs text-slate-600 px-1 py-0.5 rounded hover:bg-slate-100/70 cursor-text transition-colors flex items-start gap-1 leading-relaxed max-w-full ${getModClass('address')}`}
+                title={`العنوان ومقر العيادة: ${addrVal || 'انقر للتعديل'}`}
               >
                 <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5 select-none" />
                 <span
                   contentEditable={true}
                   suppressContentEditableWarning={true}
                   data-placeholder="العنوان والعيادة..."
-                  className="outline-none min-w-[50px] flex-1"
+                  className="outline-none min-w-[50px] flex-1 line-clamp-1 truncate"
                   onBlur={(e) => handleBlur('address', e)}
                 >
-                  {cleanGeneralText(doc.address)}
+                  {addrVal}
                 </span>
               </div>
 
@@ -313,36 +318,36 @@ function DoctorCard({ doc, index }) {
             </div>
 
             {/* Bottom Row: Phone Contacts */}
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-700 font-medium">
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-700 font-medium gap-1">
               <div
-                className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text ${getModClass('mobile')}`}
-                title="رقم الموبايل (انقر للتعديل)"
+                className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text min-w-0 max-w-[50%] ${getModClass('mobile')}`}
+                title={`رقم الموبايل: ${mobileVal || 'انقر للتعديل'}`}
               >
-                <Smartphone className="w-3.5 h-3.5 text-slate-400 select-none" />
+                <Smartphone className="w-3.5 h-3.5 text-slate-400 select-none flex-shrink-0" />
                 <span
                   contentEditable={true}
                   suppressContentEditableWarning={true}
                   data-placeholder="موبايل..."
-                  className="outline-none min-w-[40px]"
+                  className="outline-none min-w-[35px] truncate font-mono"
                   onBlur={(e) => handleBlur('mobile', e)}
                 >
-                  {doc.mobile || ''}
+                  {mobileVal}
                 </span>
               </div>
 
               <div
-                className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text ${getModClass('home_tel')}`}
-                title="رقم الهاتف الأرضي (انقر للتعديل)"
+                className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text min-w-0 max-w-[50%] justify-end ${getModClass('home_tel')}`}
+                title={`رقم الهاتف الأرضي: ${homeTelVal || 'انقر للتعديل'}`}
               >
-                <Phone className="w-3.5 h-3.5 text-slate-400 select-none" />
+                <Phone className="w-3.5 h-3.5 text-slate-400 select-none flex-shrink-0" />
                 <span
                   contentEditable={true}
                   suppressContentEditableWarning={true}
                   data-placeholder="أرضي..."
-                  className="outline-none min-w-[40px]"
+                  className="outline-none min-w-[35px] truncate font-mono text-left"
                   onBlur={(e) => handleBlur('home_tel', e)}
                 >
-                  {doc.home_tel || ''}
+                  {homeTelVal}
                 </span>
               </div>
             </div>
@@ -401,10 +406,10 @@ function DoctorCard({ doc, index }) {
             {cleanDoctorName(doc.name) || doc.name || ''}
           </div>
           <div className={getModClass('specialty')}>
-            {cleanGeneralText(doc.specialty)}
+            {specVal}
           </div>
           <div className={getModClass('address')}>
-            {cleanGeneralText(doc.address)}
+            {addrVal}
           </div>
           {isMoved && (
             <div className="moved-text note-moved">
@@ -421,10 +426,10 @@ function DoctorCard({ doc, index }) {
         {/* Bottom Contacts */}
         <div className="bottom-row">
           <div className={getModClass('mobile')}>
-            {cleanGeneralText(doc.mobile)}
+            {mobileVal}
           </div>
           <div className={getModClass('home_tel')}>
-            {cleanGeneralText(doc.home_tel)}
+            {homeTelVal}
           </div>
         </div>
       </div>

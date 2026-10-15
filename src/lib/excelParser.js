@@ -1,19 +1,39 @@
 import * as XLSX from 'xlsx';
 
 export const COL_DEFS = {
-  code: ['doctor code', 'doctor co', 'id', 'code', 'كود'],
-  name: ['doctor name', 'name', 'اسم'],
-  specialty: ['doctor spec', 'specialty', 'spec', 'تخصص'],
-  address: ['address', 'العنوان'],
-  gvr: ['governe', 'governorate', 'gov', 'gvr', 'محافظة', 'محافظه'],
-  city: ['city', 'المدينة', 'مدينة', 'مركز', 'center'],
-  region: ['region', 'المنطقة'],
-  mobile: ['mobile no', 'mobile', 'موبايل', 'رقم', 'موبيل', 'جوال'],
-  home_tel: ['home tel', 'تليفون', 'ارضي', 'tel'],
-  count_general: ['patient count', 'حالات'],
-  count_old: ['old', 'قديم'],
-  count_new: ['new', 'جديد'],
+  code: ['doctor code', 'doctor co', 'id', 'code', 'كود', 'كود الطبيب', 'كود_الطبيب'],
+  name: ['doctor name', 'name', 'اسم', 'اسم الطبيب', 'الطبيب', 'اسم_الطبيب'],
+  specialty: [
+    'doctor spec', 'specialty', 'speciality', 'spec', 'تخصص', 'التخصص', 'تخصص الطبيب',
+    'مجال', 'المجال', 'المهنة', 'doctor_spec', 'doctor spec.'
+  ],
+  address: [
+    'address', 'العنوان', 'عنوان', 'مقر العيادة', 'العيادة', 'مقر', 'مقر العمل',
+    'عنوان العيادة', 'العنوان والعيادة', 'clinic address', 'clinic', 'clinic_address'
+  ],
+  gvr: ['governe', 'governorate', 'gov', 'gvr', 'محافظة', 'محافظه', 'المحافظة'],
+  city: ['city', 'المدينة', 'مدينة', 'مركز', 'center', 'المركز'],
+  region: ['region', 'المنطقة', 'منطقة', 'حي', 'الحي'],
+  mobile: [
+    'mobile no.', 'mobile no', 'mobile', 'موبايل', 'رقم', 'موبيل', 'جوال',
+    'الموبايل', 'المحمول', 'هاتف محمول', 'موبايل العيادة', 'phone', 'cell', 'mobile_no'
+  ],
+  home_tel: [
+    'home tel.', 'home tel', 'تليفون', 'ارضي', 'أرضي', 'الأرضي', 'tel',
+    'هاتف', 'الهاتف', 'تليفون العيادة', 'ارضي العيادة', 'phone2', 'landline', 'home_tel'
+  ],
+  count_general: ['patient count', 'حالات', 'العدد', 'الحالات', 'اجمالي'],
+  count_old: ['old', 'قديم', 'القديم', 'الحالات القديمة', 'حالات سابقة'],
+  count_new: ['new', 'جديد', 'الجديد', 'الحالات الجديدة', 'حالات جديدة'],
 };
+
+function normalizeKey(str) {
+  if (!str) return '';
+  return String(str)
+    .toLowerCase()
+    .replace(/[._\-\s]+/g, ' ')
+    .trim();
+}
 
 export function cleanGeneralText(val) {
   if (val === undefined || val === null) return '';
@@ -42,7 +62,7 @@ export function getColumnMapping(dataArray) {
   if (!Array.isArray(dataArray) || dataArray.length === 0) return map;
 
   const allKeysSet = new Set();
-  const limit = Math.min(dataArray.length, 50);
+  const limit = Math.min(dataArray.length, 500);
   for (let i = 0; i < limit; i++) {
     if (dataArray[i]) {
       Object.keys(dataArray[i]).forEach((k) => allKeysSet.add(k));
@@ -51,14 +71,15 @@ export function getColumnMapping(dataArray) {
 
   const rowKeys = Array.from(allKeysSet).map((k) => ({
     orig: k,
-    low: String(k).toLowerCase().trim(),
+    norm: normalizeKey(k),
   }));
 
   for (const field in COL_DEFS) {
-    const possibles = COL_DEFS[field];
-    const match =
-      rowKeys.find((rk) => possibles.some((p) => rk.low === p.toLowerCase())) ||
-      rowKeys.find((rk) => possibles.some((p) => rk.low.includes(p.toLowerCase())));
+    const possibles = COL_DEFS[field].map(normalizeKey);
+    let match = rowKeys.find((rk) => possibles.some((p) => rk.norm === p));
+    if (!match) {
+      match = rowKeys.find((rk) => possibles.some((p) => rk.norm.includes(p) || p.includes(rk.norm)));
+    }
 
     if (match) {
       map[field] = match.orig;
@@ -182,25 +203,29 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
         idCode = String(idCode).trim();
         if (idCode === '') return;
 
-        if (!doctorsMap[idCode]) {
-          const n = cleanDoctorName(row[mapConf.name] || '');
-          const gvr = cleanGeneralText(row[mapConf.gvr] || '');
-          const city = cleanGeneralText(row[mapConf.city] || '');
-          const region = cleanGeneralText(row[mapConf.region] || '');
+        const rawSpec = cleanGeneralText(row[mapConf.specialty] || '');
+        const rawAddr = cleanGeneralText(row[mapConf.address] || '');
+        const rawMob = cleanGeneralText(row[mapConf.mobile] || '');
+        const rawHome = cleanGeneralText(row[mapConf.home_tel] || '');
+        const rawName = cleanDoctorName(row[mapConf.name] || '');
+        const gvr = cleanGeneralText(row[mapConf.gvr] || '');
+        const city = cleanGeneralText(row[mapConf.city] || '');
+        const region = cleanGeneralText(row[mapConf.region] || '');
 
+        if (!doctorsMap[idCode]) {
           doctorsMap[idCode] = {
             doc_code: cleanGeneralText(idCode),
-            name: n,
-            specialty: cleanGeneralText(row[mapConf.specialty] || ''),
-            address: cleanGeneralText(row[mapConf.address] || ''),
+            name: rawName,
+            specialty: rawSpec,
+            address: rawAddr,
             gvr,
             city,
             region,
             pageGvr: gvr,
             pageCity: city,
             pageRegion: region,
-            mobile: cleanGeneralText(row[mapConf.mobile] || ''),
-            home_tel: cleanGeneralText(row[mapConf.home_tel] || ''),
+            mobile: rawMob,
+            home_tel: rawHome,
             old_stats: '',
             new_stats: '',
             is_moved: false,
@@ -208,6 +233,24 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
             is_inactive: false,
             merged_codes: [],
           };
+        } else {
+          if (!doctorsMap[idCode].name && rawName) doctorsMap[idCode].name = rawName;
+          if (!doctorsMap[idCode].specialty && rawSpec) doctorsMap[idCode].specialty = rawSpec;
+          if (!doctorsMap[idCode].address && rawAddr) doctorsMap[idCode].address = rawAddr;
+          if (!doctorsMap[idCode].mobile && rawMob) doctorsMap[idCode].mobile = rawMob;
+          if (!doctorsMap[idCode].home_tel && rawHome) doctorsMap[idCode].home_tel = rawHome;
+          if (!doctorsMap[idCode].pageGvr && gvr) {
+            doctorsMap[idCode].gvr = gvr;
+            doctorsMap[idCode].pageGvr = gvr;
+          }
+          if (!doctorsMap[idCode].pageCity && city) {
+            doctorsMap[idCode].city = city;
+            doctorsMap[idCode].pageCity = city;
+          }
+          if (!doctorsMap[idCode].pageRegion && region) {
+            doctorsMap[idCode].region = region;
+            doctorsMap[idCode].pageRegion = region;
+          }
         }
 
         let countKey =

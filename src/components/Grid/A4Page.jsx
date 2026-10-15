@@ -35,8 +35,8 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
         <div className="flex items-center gap-2 font-bold">
           <FileText className="w-3.5 h-3.5 text-blue-500 no-print" />
           <span>صفحة {pageNum}</span>
-          <span className="no-print bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[11px] font-semibold">
-            {realCount} / 21 طبيب
+          <span className="no-print bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold">
+            {realCount} طبيب مسجل {21 - realCount > 0 ? `(+ ${21 - realCount} خانة شاغرة متبقية للطباعة)` : ''}
           </span>
         </div>
 

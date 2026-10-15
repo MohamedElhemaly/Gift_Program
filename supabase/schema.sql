@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS public.doctors (
     is_moved BOOLEAN NOT NULL DEFAULT false,
     moved_from TEXT NOT NULL DEFAULT '',
     merged_codes TEXT[] NOT NULL DEFAULT '{}'::text[],
+    has_manual_edits BOOLEAN NOT NULL DEFAULT false,
     location_id UUID REFERENCES public.locations(id) ON DELETE SET NULL,
     display_order INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
@@ -94,6 +95,7 @@ ALTER TABLE public.doctors
 ADD COLUMN IF NOT EXISTS is_moved BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS moved_from TEXT NOT NULL DEFAULT '',
 ADD COLUMN IF NOT EXISTS merged_codes TEXT[] NOT NULL DEFAULT '{}'::text[],
+ADD COLUMN IF NOT EXISTS has_manual_edits BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE public.locations

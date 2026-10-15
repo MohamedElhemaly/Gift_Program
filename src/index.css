@@ -168,17 +168,17 @@ body {
   border-color: #800080;
 }
 
-/* هيكل صفحة الطباعة A4 بدقة */
+/* هيكل صفحة الطباعة A4 على الشاشة */
 .page {
   background: white;
-  width: 210mm;
-  height: 297mm;
-  padding: 10mm;
-  margin: 0 auto 20px auto;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
-  page-break-after: always;
+  max-width: 1300px;
+  width: 100%;
+  padding: 24px;
+  margin: 0 auto 30px auto;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
   position: relative;
-  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -214,28 +214,24 @@ body {
   }
 }
 
-/* شبكة الأطباء (21 عنصر: 3 أعمدة × 7 صفوف) */
+/* شبكة الأطباء على الشاشة: 3 أعمدة مع ارتفاع مريح تلقائي يظهر جميع البيانات فوراً */
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(7, 1fr);
-  height: 255mm;
-  border-top: 2px solid black;
-  border-right: 2px solid black;
-  background: white;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  background: transparent;
   box-sizing: border-box;
 }
 
 .grid-item {
-  border-bottom: 2px solid black;
-  border-left: 2px solid black;
-  padding: 6px;
+  background: white;
+  border-radius: 12px;
+  min-height: 185px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  overflow: hidden;
   box-sizing: border-box;
-  background: white;
+  transition: all 0.2s ease;
 }
 
 .top-row {

@@ -4,6 +4,14 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const LOCAL_STORAGE_KEY = 'gift_program_doctors_data';
 const LOCAL_AUDIT_KEY = 'gift_program_audit_logs';
 
+function safeSaveLocalStorage(key, data) {
+  try {
+    localStorage.setItem(key, typeof data === 'string' ? data : JSON.stringify(data));
+  } catch (e) {
+    // Quota exceeded for large 15,000+ datasets, TanStack Query manages in-memory caching
+  }
+}
+
 export const doctorService = {
   /**
    * Log an event in the audit_logs table
@@ -147,13 +155,17 @@ export const doctorService = {
       }));
 
       // Cache locally for instant offline/reload access
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(transformed));
+      safeSaveLocalStorage(LOCAL_STORAGE_KEY, transformed);
 
       return transformed;
     } catch (err) {
-      console.warn('fetchDoctors failed on Supabase, falling back to local storage cache:', err.message);
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return cached ? JSON.parse(cached) : [];
+      console.warn('fetchDoctors failed on Supabase:', err.message);
+      try {
+        const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+        return cached ? JSON.parse(cached) : [];
+      } catch (e) {
+        return [];
+      }
     }
   },
 
@@ -182,7 +194,7 @@ export const doctorService = {
    */
   async upsertDoctorsBatch(doctorsList, onProgress = null) {
     if (!isSupabaseConfigured || !supabase) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(doctorsList));
+      safeSaveLocalStorage(LOCAL_STORAGE_KEY, doctorsList);
       await this.logAudit('IMPORT_EXCEL', `تم استيراد ${doctorsList.length} طبيب محلياً (وضع عدم الاتصال).`);
       return { success: true, count: doctorsList.length };
     }
@@ -331,7 +343,7 @@ export const doctorService = {
       }
 
       // Cache locally as well for fast access
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(doctorsList));
+      safeSaveLocalStorage(LOCAL_STORAGE_KEY, doctorsList);
 
       await this.logAudit(
         'IMPORT_EXCEL',
@@ -342,7 +354,7 @@ export const doctorService = {
     } catch (err) {
       console.error('upsertDoctorsBatch Supabase error:', err);
       // Fallback: save to local storage so user is NEVER blocked!
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(doctorsList));
+      safeSaveLocalStorage(LOCAL_STORAGE_KEY, doctorsList);
       return { success: true, count: doctorsList.length, warning: err.message };
     }
   },

@@ -40,6 +40,8 @@ export default function ControlPanel({ onPrint }) {
     setFilter,
     resetFilters,
     getUniqueFilterOptions,
+    showEmptySlotsOnScreen,
+    toggleShowEmptySlots,
   } = useDoctorStore();
 
   const [loadingAction, setLoadingAction] = useState(false);
@@ -109,7 +111,11 @@ export default function ControlPanel({ onPrint }) {
 
       // 2. Render IMMEDIATELY on screen - ZERO DELAY!
       rebuildData(mergedList);
-      localStorage.setItem('gift_program_doctors_data', JSON.stringify(mergedList));
+      try {
+        localStorage.setItem('gift_program_doctors_data', JSON.stringify(mergedList));
+      } catch (e) {
+        // quota exceeded for massive datasets, TanStack Query manages in-memory caching
+      }
       queryClient.setQueryData(QUERY_KEYS.DOCTORS, mergedList);
       toast.success(`تم استخراج ${mergedList.length} طبيب وبناء التقرير بنجاح!`);
       setStatus(`تم استخراج ${mergedList.length} طبيب! جاري المزامنة مع قاعدة البيانات في السحابة...`);
@@ -248,6 +254,20 @@ export default function ControlPanel({ onPrint }) {
               المعروض بعد الفلترة: {currentFilteredCount} طبيب ({currentTotalPages} صفحة A4)
             </div>
           )}
+
+          {/* Toggle Empty Slots on Screen */}
+          <button
+            type="button"
+            onClick={toggleShowEmptySlots}
+            className={`px-3 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+              showEmptySlotsOnScreen
+                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+            title="التبديل بين إظهار شبكة الـ 21 خانة كاملة (بالخانات الشاغرة للطباعة) أو عرض الأطباء الفعليين فقط على الشاشة"
+          >
+            <span>{showEmptySlotsOnScreen ? '🖨️ شبكة الـ 21 خانة A4 (مفعل)' : '👥 عرض الأطباء الفعليين فقط'}</span>
+          </button>
         </div>
       </div>
 

@@ -8,6 +8,7 @@ ALTER TABLE public.doctors
 ADD COLUMN IF NOT EXISTS is_moved BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS moved_from TEXT NOT NULL DEFAULT '',
 ADD COLUMN IF NOT EXISTS merged_codes TEXT[] NOT NULL DEFAULT '{}'::text[],
+ADD COLUMN IF NOT EXISTS has_manual_edits BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
 
 -- 2. إضافة عمود updated_at لجدول locations

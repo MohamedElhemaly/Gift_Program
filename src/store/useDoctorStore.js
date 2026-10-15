@@ -16,6 +16,10 @@ export const useDoctorStore = create((set, get) => ({
     lastSavedTime: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
   }),
 
+  // Toggle empty padding slots on screen (always preserved in print)
+  showEmptySlotsOnScreen: true,
+  toggleShowEmptySlots: () => set((state) => ({ showEmptySlotsOnScreen: !state.showEmptySlotsOnScreen })),
+
   // Multi-Criteria Filtering System
   filters: {
     governorate: '',

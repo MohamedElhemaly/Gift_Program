@@ -527,9 +527,15 @@ export const useDoctorStore = create((set, get) => ({
     }
 
     const rawList = [...rawDoctors];
-    const sourceInRaw = rawList.find(
-      (d) => String(d.doc_code).trim() === codeToMerge
+    let sourceInRaw = rawList.find(
+      (d) => String(d.doc_code).trim().toLowerCase() === codeToMerge.toLowerCase()
     );
+
+    if (!sourceInRaw) {
+      sourceInRaw = displayedDoctors.find(
+        (d) => String(d.doc_code).trim().toLowerCase() === codeToMerge.toLowerCase()
+      );
+    }
 
     if (!sourceInRaw) {
       throw new Error('لم يتم العثور على طبيب يحمل هذا الكود!');
@@ -586,20 +592,25 @@ export const useDoctorStore = create((set, get) => ({
       });
     }
 
-    // Clear source in rawList
-    Object.assign(sourceInRaw, {
-      name: '',
-      specialty: '',
-      address: '',
-      mobile: '',
-      home_tel: '',
-      old_stats: '',
-      new_stats: '',
-      is_inactive: false,
-      is_moved: false,
-      moved_from: '',
-      merged_codes: [],
-    });
+    // Clear source in rawList if present
+    const srcInRawList = rawList.find(
+      (d) => String(d.doc_code).trim().toLowerCase() === codeToMerge.toLowerCase()
+    );
+    if (srcInRawList) {
+      Object.assign(srcInRawList, {
+        name: '',
+        specialty: '',
+        address: '',
+        mobile: '',
+        home_tel: '',
+        old_stats: '',
+        new_stats: '',
+        is_inactive: false,
+        is_moved: false,
+        moved_from: '',
+        merged_codes: [],
+      });
+    }
 
     get().closeCombineModal();
     set({ displayedDoctors: [...displayedDoctors], rawDoctors: rawList });

@@ -8,21 +8,22 @@ export default function BlankPageModal({ isOpen, onClose }) {
   const [city, setCity] = useState('مدينة إضافية');
   const [region, setRegion] = useState('فارغة');
 
-  if (!isOpen) return null;
-
   const handleConfirm = () => {
     addBlankPage(gvr || 'صفحة إضافية', city || 'مدينة إضافية', region || 'فارغة');
     onClose();
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'Enter') handleConfirm();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gvr, city, region, onClose]);
+  }, [isOpen, gvr, city, region, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>

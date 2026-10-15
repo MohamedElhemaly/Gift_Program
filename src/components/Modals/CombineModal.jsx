@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import { useCombineDoctorsMutation } from '../../hooks/useDoctorQueries';
 import { cleanDoctorName } from '../../services/doctorService';
@@ -61,26 +61,23 @@ export default function CombineModal() {
   // Search for the source doctor in rawDoctors and displayedDoctors
   const trimmedInput = inputCode.trim();
 
-  const searchResult = useMemo(() => {
-    if (!trimmedInput) {
-      return { status: 'idle', doctor: null };
-    }
-
-    if (trimmedInput.toLowerCase() === targetCode.toLowerCase()) {
-      return { status: 'self', doctor: null };
-    }
-
+  let searchResult = { status: 'idle', doctor: null };
+  if (!trimmedInput) {
+    searchResult = { status: 'idle', doctor: null };
+  } else if (trimmedInput.toLowerCase() === targetCode.toLowerCase()) {
+    searchResult = { status: 'self', doctor: null };
+  } else {
     // Search through rawDoctors (full dataset) and fallback to displayedDoctors
     const found =
       rawDoctors?.find((d) => String(d.doc_code || '').trim().toLowerCase() === trimmedInput.toLowerCase()) ||
       displayedDoctors?.find((d) => String(d.doc_code || '').trim().toLowerCase() === trimmedInput.toLowerCase());
 
     if (found) {
-      return { status: 'found', doctor: found };
+      searchResult = { status: 'found', doctor: found };
+    } else {
+      searchResult = { status: 'not_found', doctor: null };
     }
-
-    return { status: 'not_found', doctor: null };
-  }, [trimmedInput, targetCode, rawDoctors, displayedDoctors]);
+  }
 
   const sourceDoc = searchResult.doctor;
   const sourceName = sourceDoc ? cleanDoctorName(sourceDoc.name) || sourceDoc.name || 'طبيب بدون اسم' : '';

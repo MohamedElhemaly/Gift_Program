@@ -2,6 +2,9 @@ import React, { useRef, useState } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import { doctorService } from '../../services/doctorService';
 import { parseAndMergeSheets, parseStatsOnly } from '../../lib/excelParser';
+import { queryClient } from '../../lib/queryClient';
+import { QUERY_KEYS } from '../../hooks/useDoctorQueries';
+import toast from 'react-hot-toast';
 import BlankPageModal from '../Modals/BlankPageModal';
 import {
   FileSpreadsheet,
@@ -66,7 +69,7 @@ export default function ControlPanel({ onPrint }) {
   const currentTotalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 
   /**
-   * 1. Generate Report from Excel (Upsert to DB)
+   * 1. Generate Report from Excel (Upsert to DB via Web Worker)
    */
   const handleGenerateReport = async () => {
     const docsFile = docsFileRef.current?.files?.[0];
@@ -74,26 +77,35 @@ export default function ControlPanel({ onPrint }) {
     const newFile = newFileRef.current?.files?.[0];
 
     if (!docsFile && !oldFile && !newFile) {
-      alert('برجاء رفع شيت واحد على الأقل!');
+      toast.error('برجاء رفع شيت واحد على الأقل!');
       return;
     }
 
     setLoadingAction(true);
-    setStatus('جاري استخراج البيانات والمزامنة مع قاعدة البيانات...');
+    setStatus('جاري استخراج البيانات في خلفية النظام (Web Worker)...');
 
     try {
-      // 1. Instant parsing in memory (takes ~0.5s)
-      const mergedList = await parseAndMergeSheets({ docsFile, oldFile, newFile });
+      // 1. Non-blocking Web Worker parsing
+      const mergedList = await parseAndMergeSheets({
+        docsFile,
+        oldFile,
+        newFile,
+        onProgress: (msg) => setStatus(msg),
+      });
 
       // 2. Render IMMEDIATELY on screen - ZERO DELAY!
       rebuildData(mergedList);
       localStorage.setItem('gift_program_doctors_data', JSON.stringify(mergedList));
-      setStatus(`تم استخراج ${mergedList.length} طبيب وبناء التقرير بنجاح! جاري المزامنة مع السحابة...`);
+      queryClient.setQueryData(QUERY_KEYS.DOCTORS, mergedList);
+      toast.success(`تم استخراج ${mergedList.length} طبيب وبناء التقرير بنجاح!`);
+      setStatus(`تم استخراج ${mergedList.length} طبيب! جاري المزامنة مع قاعدة البيانات في السحابة...`);
 
-      // 3. Upsert to Supabase in parallel
+      // 3. Upsert to Supabase in background
       doctorService.upsertDoctorsBatch(mergedList, (msg) => setStatus(msg))
         .then((result) => {
-          setStatus(`تم حفظ وتأكيد ${result.count} طبيب بنجاح في قاعدة البيانات.`);
+          setStatus(`تم تأكيد حفظ ${result.count} طبيب بنجاح في قاعدة البيانات.`);
+          toast.success(`تم تأكيد مزامنة ${result.count} طبيب مع قاعدة البيانات.`);
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
         })
         .catch((err) => {
           console.warn('Sync notice:', err);
@@ -101,6 +113,7 @@ export default function ControlPanel({ onPrint }) {
 
     } catch (err) {
       console.error(err);
+      toast.error('حدث خطأ أثناء قراءة الملف: ' + err.message);
       setStatus('حدث خطأ أثناء قراءة الملف: ' + err.message, true);
     } finally {
       setLoadingAction(false);
@@ -108,11 +121,11 @@ export default function ControlPanel({ onPrint }) {
   };
 
   /**
-   * 2. Update Stats Only (Excel)
+   * 2. Update Stats Only (Excel via Web Worker)
    */
   const handleUpdateStatsOnly = async () => {
     if (displayedDoctors.length === 0) {
-      alert('لا توجد بيانات حالية! ارفع شيت الأطباء أولاً.');
+      toast.error('لا توجد بيانات حالية! ارفع شيت الأطباء أولاً.');
       return;
     }
 
@@ -120,15 +133,19 @@ export default function ControlPanel({ onPrint }) {
     const newFile = updateNewFileRef.current?.files?.[0];
 
     if (!oldFile && !newFile) {
-      alert('برجاء رفع شيت القديم أو الجديد للتحديث!');
+      toast.error('برجاء رفع شيت القديم أو الجديد للتحديث!');
       return;
     }
 
     setLoadingAction(true);
-    setStatus('جاري تحديث الحالات...');
+    setStatus('جاري تحديث الحالات عبر الـ Web Worker...');
 
     try {
-      const statsList = await parseStatsOnly({ oldFile, newFile });
+      const statsList = await parseStatsOnly({
+        oldFile,
+        newFile,
+        onProgress: (msg) => setStatus(msg),
+      });
 
       // Apply updates in local store immediately
       const list = [...displayedDoctors];
@@ -154,15 +171,20 @@ export default function ControlPanel({ onPrint }) {
       });
 
       rebuildData(list);
+      queryClient.setQueryData(QUERY_KEYS.DOCTORS, list);
+      toast.success(`تم تحديث إحصائيات ${counter} طبيب فوراً!`);
       setStatus(`تم تحديث ${counter} حالة على الشاشة فوراً! جاري المزامنة في السحابة...`);
 
       // Sync to Supabase in background
       doctorService.updateStatisticsOnlyBatch(statsList, (msg) => setStatus(msg))
         .then((result) => {
           setStatus(`تم تأكيد تحديث ${result.count} حالة بنجاح في قاعدة البيانات.`);
+          toast.success(`تم تأكيد حفظ الحالات في قاعدة البيانات.`);
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
         });
     } catch (err) {
       console.error(err);
+      toast.error('خطأ في التحديث: ' + err.message);
       setStatus('خطأ في التحديث: ' + err.message, true);
     } finally {
       setLoadingAction(false);

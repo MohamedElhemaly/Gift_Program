@@ -1,6 +1,11 @@
 import React from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import {
+  useUpdateDoctorFieldMutation,
+  useToggleInactiveMutation,
+  useDeleteDoctorMutation,
+} from '../../hooks/useDoctorQueries';
+import {
   Maximize2,
   ArrowRightLeft,
   GitMerge,
@@ -14,7 +19,7 @@ import {
   Activity,
   Sparkles,
   MapPin,
-  Stethoscope
+  Stethoscope,
 } from 'lucide-react';
 
 function DoctorCard({ doc, index }) {
@@ -28,9 +33,45 @@ function DoctorCard({ doc, index }) {
     openAddDoctorModal,
   } = useDoctorStore();
 
+  const updateFieldMutation = useUpdateDoctorFieldMutation();
+  const toggleInactiveMutation = useToggleInactiveMutation();
+  const deleteDoctorMutation = useDeleteDoctorMutation();
+
   const handleBlur = (field, e) => {
     const val = e.currentTarget.innerText.trim();
+    const oldVal = String(doc[field] || '').trim();
+    if (val === oldVal) return;
+
+    // 1. Instant optimistic update in local Zustand store
     updateInlineItem(index, field, val);
+
+    // 2. Optimistic TanStack Query mutation for DB persistence & automatic rollback
+    if (doc.id || doc.doc_code) {
+      updateFieldMutation.mutate({
+        id: doc.id,
+        docCode: doc.doc_code,
+        field,
+        value: val,
+      });
+    }
+  };
+
+  const handleToggleInactive = () => {
+    toggleInactive(index);
+    if (doc.id || doc.doc_code) {
+      toggleInactiveMutation.mutate(doc);
+    }
+  };
+
+  const handleDelete = () => {
+    const docName = doc.name || doc.doc_code || 'هذا الطبيب';
+    if (!window.confirm(`هل أنت متأكد من حذف الطبيب: "${docName}" نهائياً من قاعدة البيانات؟`)) {
+      return;
+    }
+    deleteDoctor(index);
+    if (doc.id || doc.doc_code) {
+      deleteDoctorMutation.mutate(doc);
+    }
   };
 
   const getModClass = (field) => {
@@ -76,7 +117,7 @@ function DoctorCard({ doc, index }) {
               <span>{doc.counter || index + 1}</span>
             </span>
 
-            {/* Doctor Code Badge - with separate label so editing code is easy */}
+            {/* Doctor Code Badge */}
             <div
               className={`inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 hover:border-blue-400 shadow-2xs ${getModClass('doc_code')}`}
               title="كود الطبيب (انقر للتعديل)"
@@ -135,7 +176,7 @@ function DoctorCard({ doc, index }) {
                   ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
                   : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
               }`}
-              onClick={() => toggleInactive(index)}
+              onClick={handleToggleInactive}
               title={doc.is_inactive ? 'إعادة تفعيل الطبيب' : 'إيقاف مؤقت (إخفاء في الطباعة)'}
             >
               {doc.is_inactive ? (
@@ -150,7 +191,7 @@ function DoctorCard({ doc, index }) {
               <button
                 type="button"
                 className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                onClick={() => deleteDoctor(index)}
+                onClick={handleDelete}
                 title="حذف هذا الطبيب نهائياً"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -367,4 +408,9 @@ function DoctorCard({ doc, index }) {
   );
 }
 
-export default React.memo(DoctorCard);
+export default React.memo(DoctorCard, (prevProps, nextProps) => {
+  return (
+    prevProps.doc === nextProps.doc &&
+    prevProps.index === nextProps.index
+  );
+});

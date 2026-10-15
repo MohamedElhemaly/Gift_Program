@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
+import { useMoveDoctorMutation } from '../../hooks/useDoctorQueries';
 
 export default function MoveModal() {
   const {
@@ -9,6 +10,8 @@ export default function MoveModal() {
     closeMoveModal,
     confirmMove,
   } = useDoctorStore();
+
+  const moveDoctorMutation = useMoveDoctorMutation();
 
   const [selectedDest, setSelectedDest] = useState('');
   const [newGvr, setNewGvr] = useState('');
@@ -61,7 +64,18 @@ export default function MoveModal() {
       r = parts[2] || '';
     }
 
+    // 1. Instant store update
     confirmMove({ gvr: g, city: c, region: r });
+
+    // 2. Optimistic TanStack Query mutation
+    if (currentDoc && (currentDoc.id || currentDoc.doc_code)) {
+      moveDoctorMutation.mutate({
+        doctor: currentDoc,
+        newGvr: g,
+        newCity: c,
+        newRegion: r,
+      });
+    }
   };
 
   const isNewSelected = selectedDest === 'NEW';

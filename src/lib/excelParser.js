@@ -22,7 +22,6 @@ export function getColumnMapping(dataArray) {
   const map = {};
   if (!Array.isArray(dataArray) || dataArray.length === 0) return map;
 
-  // Gather all unique keys from the first 50 rows
   const allKeysSet = new Set();
   const limit = Math.min(dataArray.length, 50);
   for (let i = 0; i < limit; i++) {
@@ -51,7 +50,15 @@ export function getColumnMapping(dataArray) {
 }
 
 /**
- * Read Excel file to JSON array
+ * Read file to ArrayBuffer
+ */
+async function fileToArrayBuffer(file) {
+  if (!file) return null;
+  return await file.arrayBuffer();
+}
+
+/**
+ * Fallback direct parser if Web Worker is unavailable
  */
 export async function readExcelFile(file) {
   if (!file) return [];
@@ -75,135 +82,200 @@ export async function readExcelFile(file) {
 }
 
 /**
- * Main parser merging Docs, Old, and New sheets
+ * Run task in Web Worker with fallback
  */
-export async function parseAndMergeSheets({ docsFile, oldFile, newFile }) {
-  const [docsData, oldData, newData] = await Promise.all([
-    readExcelFile(docsFile),
-    readExcelFile(oldFile),
-    readExcelFile(newFile),
-  ]);
+function runInWorker(type, payload, onProgress = null) {
+  return new Promise((resolve, reject) => {
+    try {
+      const worker = new Worker(new URL('../workers/excelWorker.js', import.meta.url), {
+        type: 'module',
+      });
 
-  if (!docsData.length && !oldData.length && !newData.length) {
-    throw new Error('برجاء رفع شيت واحد على الأقل!');
-  }
+      const id = crypto.randomUUID();
 
-  const docsMapConf = getColumnMapping(docsData);
-  const oldMapConf = getColumnMapping(oldData);
-  const newMapConf = getColumnMapping(newData);
+      worker.onmessage = (e) => {
+        const data = e.data;
+        if (data.id !== id) return;
 
-  const doctorsMap = {};
-
-  function processDataset(dataset, mapConf, type) {
-    if (!dataset || dataset.length === 0) return;
-
-    dataset.forEach((row) => {
-      let idCode = row[mapConf.code];
-      if (idCode === undefined || idCode === null) return;
-      idCode = String(idCode).trim();
-      if (idCode === '') return;
-
-      if (!doctorsMap[idCode]) {
-        let n = row[mapConf.name] || '';
-        if (n && !String(n).includes('أ.د/')) {
-          n = 'أ.د/ ' + n;
+        if (data.type === 'PROGRESS') {
+          if (onProgress) onProgress(data.message);
+        } else if (data.type === 'SUCCESS') {
+          worker.terminate();
+          resolve(data.result);
+        } else if (data.type === 'ERROR') {
+          worker.terminate();
+          reject(new Error(data.error));
         }
+      };
 
-        const gvr = String(row[mapConf.gvr] || '').trim();
-        const city = String(row[mapConf.city] || '').trim();
-        const region = String(row[mapConf.region] || '').trim();
+      worker.onerror = (err) => {
+        worker.terminate();
+        reject(err);
+      };
 
-        doctorsMap[idCode] = {
-          doc_code: idCode,
-          name: n,
-          specialty: String(row[mapConf.specialty] || '').trim(),
-          address: String(row[mapConf.address] || '').trim(),
-          gvr,
-          city,
-          region,
-          pageGvr: gvr,
-          pageCity: city,
-          pageRegion: region,
-          mobile: String(row[mapConf.mobile] || '').trim(),
-          home_tel: String(row[mapConf.home_tel] || '').trim(),
-          old_stats: '',
-          new_stats: '',
-          is_moved: false,
-          moved_from: '',
-          is_inactive: false,
-          merged_codes: [],
-        };
-      }
-
-      let countKey =
-        type === 'docs'
-          ? mapConf.count_general
-          : type === 'old'
-          ? mapConf.count_old
-          : mapConf.count_new;
-
-      if (!countKey && type === 'old') countKey = mapConf.count_general;
-      if (!countKey && type === 'new') countKey = mapConf.count_general;
-
-      const countVal = row[countKey];
-      if (countVal !== undefined && countVal !== null) {
-        if (type === 'docs' || type === 'old') {
-          doctorsMap[idCode].old_stats = countVal;
-        } else {
-          doctorsMap[idCode].new_stats = countVal;
-        }
-      }
-    });
-  }
-
-  processDataset(docsData, docsMapConf, 'docs');
-  processDataset(oldData, oldMapConf, 'old');
-  processDataset(newData, newMapConf, 'new');
-
-  return Object.values(doctorsMap);
+      worker.postMessage({ type, payload, id });
+    } catch (workerErr) {
+      console.warn('Web Worker creation failed, falling back to main thread:', workerErr);
+      reject(workerErr);
+    }
+  });
 }
 
 /**
- * Parse sheets for "تحديث الحالات فقط" (Old & New stats only)
+ * Main parser merging Docs, Old, and New sheets using Web Worker
  */
-export async function parseStatsOnly({ oldFile, newFile }) {
-  const [oldData, newData] = await Promise.all([
-    readExcelFile(oldFile),
-    readExcelFile(newFile),
-  ]);
+export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgress = null }) {
+  if (!docsFile && !oldFile && !newFile) {
+    throw new Error('برجاء رفع شيت واحد على الأقل!');
+  }
 
-  if (!oldData.length && !newData.length) {
+  try {
+    // Attempt fast non-blocking worker parsing
+    const [docsBuffer, oldBuffer, newBuffer] = await Promise.all([
+      fileToArrayBuffer(docsFile),
+      fileToArrayBuffer(oldFile),
+      fileToArrayBuffer(newFile),
+    ]);
+
+    return await runInWorker('PARSE_AND_MERGE', { docsBuffer, oldBuffer, newBuffer }, onProgress);
+  } catch (workerError) {
+    console.warn('Falling back to synchronous main thread parsing:', workerError);
+
+    // Fallback on main thread
+    const [docsData, oldData, newData] = await Promise.all([
+      readExcelFile(docsFile),
+      readExcelFile(oldFile),
+      readExcelFile(newFile),
+    ]);
+
+    const docsMapConf = getColumnMapping(docsData);
+    const oldMapConf = getColumnMapping(oldData);
+    const newMapConf = getColumnMapping(newData);
+
+    const doctorsMap = {};
+
+    function processDataset(dataset, mapConf, type) {
+      if (!dataset || dataset.length === 0) return;
+
+      dataset.forEach((row) => {
+        let idCode = row[mapConf.code];
+        if (idCode === undefined || idCode === null) return;
+        idCode = String(idCode).trim();
+        if (idCode === '') return;
+
+        if (!doctorsMap[idCode]) {
+          let n = row[mapConf.name] || '';
+          if (n && !String(n).includes('أ.د/')) {
+            n = 'أ.د/ ' + n;
+          }
+
+          const gvr = String(row[mapConf.gvr] || '').trim();
+          const city = String(row[mapConf.city] || '').trim();
+          const region = String(row[mapConf.region] || '').trim();
+
+          doctorsMap[idCode] = {
+            doc_code: idCode,
+            name: n,
+            specialty: String(row[mapConf.specialty] || '').trim(),
+            address: String(row[mapConf.address] || '').trim(),
+            gvr,
+            city,
+            region,
+            pageGvr: gvr,
+            pageCity: city,
+            pageRegion: region,
+            mobile: String(row[mapConf.mobile] || '').trim(),
+            home_tel: String(row[mapConf.home_tel] || '').trim(),
+            old_stats: '',
+            new_stats: '',
+            is_moved: false,
+            moved_from: '',
+            is_inactive: false,
+            merged_codes: [],
+          };
+        }
+
+        let countKey =
+          type === 'docs'
+            ? mapConf.count_general
+            : type === 'old'
+            ? mapConf.count_old
+            : mapConf.count_new;
+
+        if (!countKey && type === 'old') countKey = mapConf.count_general;
+        if (!countKey && type === 'new') countKey = mapConf.count_general;
+
+        const countVal = row[countKey];
+        if (countVal !== undefined && countVal !== null) {
+          if (type === 'docs' || type === 'old') {
+            doctorsMap[idCode].old_stats = countVal;
+          } else {
+            doctorsMap[idCode].new_stats = countVal;
+          }
+        }
+      });
+    }
+
+    processDataset(docsData, docsMapConf, 'docs');
+    processDataset(oldData, oldMapConf, 'old');
+    processDataset(newData, newMapConf, 'new');
+
+    return Object.values(doctorsMap);
+  }
+}
+
+/**
+ * Parse sheets for "تحديث الحالات فقط" (Old & New stats only) with Web Worker
+ */
+export async function parseStatsOnly({ oldFile, newFile, onProgress = null }) {
+  if (!oldFile && !newFile) {
     throw new Error('برجاء رفع شيت القديم أو الجديد على الأقل!');
   }
 
-  const oldMapConf = getColumnMapping(oldData);
-  const newMapConf = getColumnMapping(newData);
+  try {
+    const [oldBuffer, newBuffer] = await Promise.all([
+      fileToArrayBuffer(oldFile),
+      fileToArrayBuffer(newFile),
+    ]);
 
-  const updatesMap = {};
+    return await runInWorker('PARSE_STATS_ONLY', { oldBuffer, newBuffer }, onProgress);
+  } catch (workerError) {
+    console.warn('Falling back to synchronous stats parser:', workerError);
 
-  oldData.forEach((r) => {
-    const code = r[oldMapConf.code];
-    if (code) {
-      const c = String(code).trim();
-      const val = r[oldMapConf.count_old] !== undefined ? r[oldMapConf.count_old] : r[oldMapConf.count_general];
-      if (val !== undefined) {
-        if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
-        updatesMap[c].old_stats = val;
+    const [oldData, newData] = await Promise.all([
+      readExcelFile(oldFile),
+      readExcelFile(newFile),
+    ]);
+
+    const oldMapConf = getColumnMapping(oldData);
+    const newMapConf = getColumnMapping(newData);
+
+    const updatesMap = {};
+
+    oldData.forEach((r) => {
+      const code = r[oldMapConf.code];
+      if (code) {
+        const c = String(code).trim();
+        const val = r[oldMapConf.count_old] !== undefined ? r[oldMapConf.count_old] : r[oldMapConf.count_general];
+        if (val !== undefined) {
+          if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
+          updatesMap[c].old_stats = val;
+        }
       }
-    }
-  });
+    });
 
-  newData.forEach((r) => {
-    const code = r[newMapConf.code];
-    if (code) {
-      const c = String(code).trim();
-      const val = r[newMapConf.count_new] !== undefined ? r[newMapConf.count_new] : r[newMapConf.count_general];
-      if (val !== undefined) {
-        if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
-        updatesMap[c].new_stats = val;
+    newData.forEach((r) => {
+      const code = r[newMapConf.code];
+      if (code) {
+        const c = String(code).trim();
+        const val = r[newMapConf.count_new] !== undefined ? r[newMapConf.count_new] : r[newMapConf.count_general];
+        if (val !== undefined) {
+          if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
+          updatesMap[c].new_stats = val;
+        }
       }
-    }
-  });
+    });
 
-  return Object.values(updatesMap);
+    return Object.values(updatesMap);
+  }
 }

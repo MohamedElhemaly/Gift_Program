@@ -1,6 +1,11 @@
 import React from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import {
+  useUpdateDoctorFieldMutation,
+  useToggleInactiveMutation,
+  useDeleteDoctorMutation,
+} from '../../hooks/useDoctorQueries';
+import {
   Minimize2,
   X,
   ArrowRightLeft,
@@ -29,12 +34,43 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
     clearDoctorSlot,
   } = useDoctorStore();
 
+  const updateFieldMutation = useUpdateDoctorFieldMutation();
+  const toggleInactiveMutation = useToggleInactiveMutation();
+  const deleteDoctorMutation = useDeleteDoctorMutation();
+
   if (!isOpen || index === -1 || !displayedDoctors[index]) return null;
 
   const doc = displayedDoctors[index];
 
   const handleFieldChange = (field, value) => {
     updateInlineItem(index, field, value);
+    if (doc.id || doc.doc_code) {
+      updateFieldMutation.mutate({
+        id: doc.id,
+        docCode: doc.doc_code,
+        field,
+        value,
+      });
+    }
+  };
+
+  const handleToggleInactive = () => {
+    toggleInactive(index);
+    if (doc.id || doc.doc_code) {
+      toggleInactiveMutation.mutate(doc);
+    }
+  };
+
+  const handleDelete = () => {
+    const docName = doc.name || doc.doc_code || 'هذا الطبيب';
+    if (!window.confirm(`هل أنت متأكد من حذف الطبيب: "${docName}" نهائياً من قاعدة البيانات؟`)) {
+      return;
+    }
+    onClose();
+    deleteDoctor(index);
+    if (doc.id || doc.doc_code) {
+      deleteDoctorMutation.mutate(doc);
+    }
   };
 
   const getModClass = (field) => {
@@ -96,7 +132,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
 
             <button
               type="button"
-              onClick={() => toggleInactive(index)}
+              onClick={handleToggleInactive}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-xs border transition-colors ${
                 doc.is_inactive
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
@@ -132,10 +168,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
             {/* Delete Doctor */}
             <button
               type="button"
-              onClick={() => {
-                onClose();
-                deleteDoctor(index);
-              }}
+              onClick={handleDelete}
               className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs border border-rose-200 transition-colors"
               title="حذف الطبيب نهائياً"
             >

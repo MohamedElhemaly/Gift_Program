@@ -285,6 +285,13 @@ export const useDoctorStore = create((set, get) => ({
     }
   },
 
+  setRawDoctorsAndRebuild: (docs) => {
+    set({ rawDoctors: docs });
+    get().rebuildData(docs);
+  },
+
+  setLocations: (locs) => set({ locations: locs }),
+
   /**
    * Inline Edit Handler with Auto-Save
    */

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 import { useDoctorStore } from './store/useDoctorStore';
+import { useDoctorsData, useLocationsData, QUERY_KEYS } from './hooks/useDoctorQueries';
+import { queryClient } from './lib/queryClient';
 import { doctorService } from './services/doctorService';
 import { isSupabaseConfigured } from './lib/supabase';
 import { handleExportPDF } from './utils/printHelper';
@@ -13,14 +15,12 @@ import CombineModal from './components/Modals/CombineModal';
 import DoctorDetailModal from './components/Modals/DoctorDetailModal';
 import AddDoctorModal from './components/Modals/AddDoctorModal';
 
-import { LogOut, User, Database } from 'lucide-react';
+import { LogOut, User, Database, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const { user, loading: authLoading, initAuth, signOut, isDemoMode } = useAuthStore();
   const {
     displayedDoctors,
-    loadFromDB,
-    loading: docsLoading,
     setStatus,
     maximizedDoctorIndex,
     closeMaximizeModal,
@@ -28,33 +28,30 @@ export default function App() {
 
   const [selectedPages, setSelectedPages] = useState(null);
 
+  // TanStack Query hooks for instant local cache load + background sync
+  const { isLoading: docsLoading, isFetching: docsFetching, refetch } = useDoctorsData();
+  useLocationsData();
+
   // Initialize Auth on mount
   useEffect(() => {
     initAuth();
   }, [initAuth]);
 
-  // Load doctors once authenticated
-  useEffect(() => {
-    if (user) {
-      loadFromDB();
-    }
-  }, [user, loadFromDB]);
-
-  // Set up real-time sync with Supabase
+  // Real-time synchronization via TanStack Query invalidation
   useEffect(() => {
     if (user && isSupabaseConfigured && !isDemoMode) {
       const unsubscribe = doctorService.subscribeToChanges(({ table, payload }) => {
         console.log(`Real-time update on ${table}:`, payload);
         setStatus('تم استلام تحديث جديد من السيرفر...');
-        loadFromDB();
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
       });
       return () => {
         unsubscribe();
       };
     }
-  }, [user, isDemoMode, loadFromDB, setStatus]);
+  }, [user, isDemoMode, setStatus]);
 
-  const totalPages = Math.ceil(displayedDoctors.length / 21);
+  const totalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 
   const handlePrintRequest = (rangeStr) => {
     handleExportPDF(rangeStr, totalPages, setSelectedPages);
@@ -94,6 +91,14 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-4 text-xs">
+          {/* Background fetching indicator */}
+          {docsFetching && !docsLoading && (
+            <div className="flex items-center gap-1.5 text-blue-600 font-medium bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200 animate-pulse">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              <span>مزامنة خلفية...</span>
+            </div>
+          )}
+
           {/* Supabase Status Indicator */}
           <div
             className={`px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium ${
@@ -130,10 +135,10 @@ export default function App() {
         <ControlPanel onPrint={handlePrintRequest} />
 
         {/* Loading Indicator */}
-        {docsLoading && (
+        {docsLoading && displayedDoctors.length === 0 && (
           <div className="no-print my-6 p-4 text-center bg-white border border-[#ccc] rounded">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#007bff] mx-auto mb-2"></div>
-            <p className="text-sm font-bold text-gray-700">جاري تحميل داتا الأطباء...</p>
+            <p className="text-sm font-bold text-gray-700">جاري تحميل داتا الأطباء من قاعدة البيانات...</p>
           </div>
         )}
 

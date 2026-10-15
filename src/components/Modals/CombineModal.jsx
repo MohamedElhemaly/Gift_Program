@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
+import { useCombineDoctorsMutation } from '../../hooks/useDoctorQueries';
 
 export default function CombineModal() {
   const {
@@ -9,6 +10,8 @@ export default function CombineModal() {
     closeCombineModal,
     confirmCombine,
   } = useDoctorStore();
+
+  const combineDoctorsMutation = useCombineDoctorsMutation();
 
   const [inputCode, setInputCode] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -35,7 +38,16 @@ export default function CombineModal() {
     }
 
     try {
+      // 1. Instant store update
       await confirmCombine(code);
+
+      // 2. Optimistic TanStack Query mutation
+      if (currentDoc) {
+        combineDoctorsMutation.mutate({
+          targetCode: currentDoc.doc_code,
+          sourceCode: code,
+        });
+      }
     } catch (err) {
       setErrorMsg(err.message);
     }

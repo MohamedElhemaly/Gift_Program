@@ -511,8 +511,11 @@ export const useDoctorStore = create((set, get) => ({
   /**
    * Confirm Combine with Auto-Save
    */
-  confirmCombine: async (sourceCode) => {
-    const { activeModalIndex, displayedDoctors } = get();
+  /**
+   * Confirm Combine with Optimistic UI
+   */
+  confirmCombine: (sourceCode) => {
+    const { activeModalIndex, displayedDoctors, rawDoctors } = get();
     if (activeModalIndex === -1) return;
 
     const targetDoc = displayedDoctors[activeModalIndex];
@@ -523,34 +526,68 @@ export const useDoctorStore = create((set, get) => ({
       throw new Error('لا يمكنك دمج الطبيب مع نفسه!');
     }
 
-    const sourceIndex = displayedDoctors.findIndex(
+    const rawList = [...rawDoctors];
+    const sourceInRaw = rawList.find(
       (d) => String(d.doc_code).trim() === codeToMerge
     );
 
-    if (sourceIndex === -1) {
+    if (!sourceInRaw) {
       throw new Error('لم يتم العثور على طبيب يحمل هذا الكود!');
     }
 
-    const sourceDoc = displayedDoctors[sourceIndex];
+    const sourceStatsOld = parseInt(sourceInRaw.old_stats, 10) || 0;
+    const sourceStatsNew = parseInt(sourceInRaw.new_stats, 10) || 0;
 
-    // Combine stats
-    targetDoc.old_stats = (parseInt(targetDoc.old_stats, 10) || 0) + (parseInt(sourceDoc.old_stats, 10) || 0);
-    targetDoc.new_stats = (parseInt(targetDoc.new_stats, 10) || 0) + (parseInt(sourceDoc.new_stats, 10) || 0);
+    // Combine stats on target
+    targetDoc.old_stats = (parseInt(targetDoc.old_stats, 10) || 0) + sourceStatsOld;
+    targetDoc.new_stats = (parseInt(targetDoc.new_stats, 10) || 0) + sourceStatsNew;
     targetDoc.old_stats_modified = true;
     targetDoc.new_stats_modified = true;
     targetDoc.old_stats_updated = false;
     targetDoc.new_stats_updated = false;
 
     if (!targetDoc.merged_codes) targetDoc.merged_codes = [];
-    if (sourceDoc.doc_code && !targetDoc.merged_codes.includes(sourceDoc.doc_code)) {
-      targetDoc.merged_codes.push(sourceDoc.doc_code);
+    if (sourceInRaw.doc_code && !targetDoc.merged_codes.includes(sourceInRaw.doc_code)) {
+      targetDoc.merged_codes.push(sourceInRaw.doc_code);
     }
-    if (sourceDoc.merged_codes && sourceDoc.merged_codes.length) {
-      targetDoc.merged_codes.push(...sourceDoc.merged_codes);
+    if (sourceInRaw.merged_codes && sourceInRaw.merged_codes.length) {
+      targetDoc.merged_codes.push(...sourceInRaw.merged_codes);
     }
 
-    // Clear source doc
-    Object.assign(sourceDoc, {
+    // Also update target in rawList
+    const targetInRaw = rawList.find(
+      (d) => String(d.doc_code).trim() === String(targetDoc.doc_code).trim()
+    );
+    if (targetInRaw) {
+      targetInRaw.old_stats = targetDoc.old_stats;
+      targetInRaw.new_stats = targetDoc.new_stats;
+      targetInRaw.merged_codes = [...targetDoc.merged_codes];
+      targetInRaw.old_stats_modified = true;
+      targetInRaw.new_stats_modified = true;
+    }
+
+    // Clear source doc in displayedDoctors if visible
+    const sourceInDisplayed = displayedDoctors.find(
+      (d) => String(d.doc_code).trim() === codeToMerge
+    );
+    if (sourceInDisplayed) {
+      Object.assign(sourceInDisplayed, {
+        name: '',
+        specialty: '',
+        address: '',
+        mobile: '',
+        home_tel: '',
+        old_stats: '',
+        new_stats: '',
+        is_inactive: false,
+        is_moved: false,
+        moved_from: '',
+        merged_codes: [],
+      });
+    }
+
+    // Clear source in rawList
+    Object.assign(sourceInRaw, {
       name: '',
       specialty: '',
       address: '',
@@ -565,18 +602,8 @@ export const useDoctorStore = create((set, get) => ({
     });
 
     get().closeCombineModal();
-    set({ displayedDoctors: [...displayedDoctors] });
+    set({ displayedDoctors: [...displayedDoctors], rawDoctors: rawList });
     get().setAutoSaveState('saving');
-
-    try {
-      await doctorService.combineDoctors(targetDoc.doc_code, codeToMerge);
-      get().setAutoSaveState('saved');
-      get().setStatus(`تم دمج الطبيب (${codeToMerge}) مع (${targetDoc.doc_code}) بنجاح.`);
-    } catch (err) {
-      console.error('Failed to combine doctors on DB:', err);
-      get().setAutoSaveState('error');
-      get().setStatus('خطأ أثناء الدمج: ' + err.message, true);
-    }
   },
 
   /**

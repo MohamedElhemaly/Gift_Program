@@ -1,5 +1,5 @@
 /**
- * Parse page range string and trigger browser print dialog
+ * Parse page range string and trigger browser print dialog with afterprint listener
  */
 export function handleExportPDF(pageRangeStr, totalPages, setSelectedPages) {
   if (totalPages === 0) {
@@ -36,11 +36,17 @@ export function handleExportPDF(pageRangeStr, totalPages, setSelectedPages) {
   // Filter visible pages for printing
   setSelectedPages(sel);
 
+  const cleanup = () => {
+    setSelectedPages(null);
+    window.removeEventListener('afterprint', cleanup);
+  };
+
+  window.addEventListener('afterprint', cleanup);
+
+  // Small delay to allow DOM to render the selected print pages
   setTimeout(() => {
     window.print();
-    // Reset to show all pages again after printing
-    setTimeout(() => {
-      setSelectedPages(null);
-    }, 500);
-  }, 300);
+    // Fallback cleanup after 3 seconds in case browser doesn't fire afterprint
+    setTimeout(cleanup, 3000);
+  }, 350);
 }

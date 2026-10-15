@@ -239,7 +239,7 @@ function renderDoctorCardHTML(doc) {
         <div class="doc-name ${getModClass('name')}">${escapeHTML(cleanName)}</div>
         <div class="${getModClass('specialty')}">${escapeHTML(cleanSpecialty)}</div>
         <div class="${getModClass('address')}">${escapeHTML(cleanAddress)}</div>
-        ${doc.is_moved && doc.moved_from ? `<div class="moved-text note-moved">كان في: ${escapeHTML(cleanGeneralText(doc.moved_from))}</div>` : ''}
+        ${doc.is_moved ? `<div class="moved-text note-moved">كان في: ${escapeHTML(cleanGeneralText(doc.moved_from) || 'موقع سابق')}</div>` : ''}
         ${doc.merged_codes && doc.merged_codes.length ? `<div class="moved-text note-merged">+ مدمج مع: ${escapeHTML(doc.merged_codes.join(', '))}</div>` : ''}
       </div>
       <div class="bottom-row">

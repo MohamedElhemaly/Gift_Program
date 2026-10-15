@@ -332,9 +332,12 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
           {/* Moved / Merged Info Badges */}
           {(doc.is_moved || (doc.merged_codes && doc.merged_codes.length > 0)) && (
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex flex-wrap gap-2">
-              {doc.is_moved && doc.moved_from && (
-                <div className="text-xs font-bold px-2.5 py-1 rounded bg-rose-100 text-rose-800 border border-rose-300">
-                  كان في: {doc.moved_from}
+              {doc.is_moved && (
+                <div className="text-xs font-bold px-2.5 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 italic">
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-amber-700 not-italic select-none" />
+                  <span>
+                    كان في: <span className="not-italic font-semibold">{doc.moved_from || 'موقع سابق'}</span>
+                  </span>
                 </div>
               )}
               {doc.merged_codes && doc.merged_codes.length > 0 && (

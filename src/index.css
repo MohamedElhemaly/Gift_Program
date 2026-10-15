@@ -98,8 +98,9 @@ body {
 }
 
 .moved-highlight {
-  background-color: #fff1f2 !important; /* وردي ناعم أنيق */
-  box-shadow: inset 0 0 0 1px #fda4af;
+  background-color: #fffbeb !important; /* أصفر عنبري هادئ ومميز bg-amber-50 */
+  border-color: #fcd34d !important;
+  box-shadow: inset 0 0 0 1px #fcd34d;
 }
 
 .updated-stats {
@@ -461,9 +462,12 @@ body {
   }
 
   .moved-highlight {
-    background-color: #ffe6e6 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-color: #000000 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: economy !important;
+    print-color-adjust: economy !important;
   }
 
   .updated-stats {

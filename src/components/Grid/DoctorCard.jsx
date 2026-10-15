@@ -77,14 +77,21 @@ function DoctorCard({ doc, index }) {
   };
 
   const isInactive = Boolean(doc.is_inactive);
+  const isMoved = Boolean(doc.is_moved);
   const hasData = Boolean(doc.doc_code || doc.name);
-  const movedClass = doc.is_moved ? 'moved-highlight' : '';
+  const movedClass = isMoved ? 'moved-highlight' : '';
   const inactiveClass = isInactive ? 'inactive-doc' : '';
   const hideEmptyOnScreen = !hasData && !showEmptySlotsOnScreen;
 
-  // Conditionally apply red background when is_inactive is true (Optimistic UI)
+  // Conditionally apply background theme:
+  // 1. Inactive: Light Red (Optimistic UI)
+  // 2. Moved: Distinct Amber (Visual highlight on screen only)
+  // 3. Normal with Data: Clean White
+  // 4. Empty slot: Dashed slate
   const cardThemeClass = isInactive
     ? 'bg-rose-100/90 border-rose-300 hover:border-rose-400 shadow-xs ring-1 ring-rose-200'
+    : isMoved
+    ? 'bg-amber-50/90 border-amber-300 hover:border-amber-400 shadow-xs ring-1 ring-amber-200'
     : hasData
     ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md'
     : 'bg-slate-50/50 border-dashed border-slate-300 hover:bg-white hover:border-blue-300';
@@ -94,7 +101,7 @@ function DoctorCard({ doc, index }) {
       className={`grid-item relative transition-all duration-200 p-3 rounded-xl border
         ${hideEmptyOnScreen ? 'hidden print:flex' : ''}
         ${cardThemeClass}
-        print:rounded-none print:shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:bg-white print:p-[6px]
+        print:bg-white print:rounded-none print:shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:p-[6px]
         ${movedClass} ${inactiveClass}`}
       id={`item-${index}`}
     >
@@ -242,9 +249,15 @@ function DoctorCard({ doc, index }) {
               </div>
 
               {/* Moved Notice Badge */}
-              {doc.is_moved && doc.moved_from && (
-                <div className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 w-fit">
-                  كان في: {doc.moved_from}
+              {isMoved && (
+                <div
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs w-fit italic"
+                  title={`طبيب منقول من: ${cleanGeneralText(doc.moved_from) || 'موقع سابق'}`}
+                >
+                  <ArrowRightLeft className="w-3 h-3 text-amber-700 flex-shrink-0 not-italic select-none" />
+                  <span>
+                    كان في: <span className="font-semibold not-italic">{cleanGeneralText(doc.moved_from) || 'موقع سابق'}</span>
+                  </span>
                 </div>
               )}
 
@@ -393,9 +406,9 @@ function DoctorCard({ doc, index }) {
           <div className={getModClass('address')}>
             {cleanGeneralText(doc.address)}
           </div>
-          {doc.is_moved && doc.moved_from && (
+          {isMoved && (
             <div className="moved-text note-moved">
-              كان في: {cleanGeneralText(doc.moved_from)}
+              كان في: {cleanGeneralText(doc.moved_from) || 'موقع سابق'}
             </div>
           )}
           {doc.merged_codes && doc.merged_codes.length > 0 && (

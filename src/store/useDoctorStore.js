@@ -475,14 +475,15 @@ export const useDoctorStore = create((set, get) => ({
    * Confirm Move with Auto-Save
    */
   confirmMove: async (destination) => {
-    const { activeModalIndex, displayedDoctors } = get();
+    const { activeModalIndex, displayedDoctors, rawDoctors } = get();
     if (activeModalIndex === -1) return;
 
     const doc = displayedDoctors[activeModalIndex];
     if (!doc) return;
 
     const { gvr, city, region } = destination;
-    const oldLoc = `${doc.pageGvr || ''} - ${doc.pageCity || ''} - ${doc.pageRegion || ''}`;
+    const locParts = [doc.pageGvr, doc.pageCity, doc.pageRegion].map((s) => String(s || '').trim()).filter(Boolean);
+    const oldLoc = locParts.length > 0 ? locParts.join(' - ') : (doc.moved_from || 'موقع سابق');
 
     doc.is_moved = true;
     doc.moved_from = oldLoc;
@@ -492,6 +493,25 @@ export const useDoctorStore = create((set, get) => ({
     doc.pageGvr_modified = true;
     doc.pageCity_modified = true;
     doc.pageRegion_modified = true;
+
+    // Keep rawDoctors updated too so rebuildData preserves the moved status
+    const rawList = (rawDoctors || []).map((d) => {
+      if ((doc.id && d.id === doc.id) || (doc.doc_code && String(d.doc_code).trim() === String(doc.doc_code).trim())) {
+        return {
+          ...d,
+          is_moved: true,
+          moved_from: oldLoc,
+          pageGvr: gvr,
+          pageCity: city,
+          pageRegion: region,
+          pageGvr_modified: true,
+          pageCity_modified: true,
+          pageRegion_modified: true,
+        };
+      }
+      return d;
+    });
+    set({ rawDoctors: rawList });
 
     get().closeMoveModal();
     get().rebuildData();

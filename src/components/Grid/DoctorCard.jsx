@@ -127,20 +127,13 @@ function DoctorCard({ doc, index }) {
                   </span>
                 </span>
 
-                {/* Doctor Code Badge */}
+                {/* Doctor Code Badge (Strictly READ-ONLY Primary Key) */}
                 <div
-                  className={`inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 hover:border-blue-400 shadow-2xs ${getModClass('doc_code')}`}
-                  title="كود الطبيب (انقر للتعديل)"
+                  className={`inline-flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs select-none ${getModClass('doc_code')}`}
+                  title="كود الطبيب (معرّف أساسي محمي - للقراءة فقط)"
                 >
-                  <span className="text-[10px] text-blue-500 font-sans font-semibold select-none">كود:</span>
-                  <span
-                    className="outline-none cursor-text px-1 rounded hover:bg-white min-w-[20px]"
-                    contentEditable={true}
-                    suppressContentEditableWarning={true}
-                    data-placeholder="..."
-                    onClick={(e) => e.currentTarget.focus()}
-                    onBlur={(e) => handleBlur('doc_code', e)}
-                  >
+                  <span className="text-[10px] text-blue-500 font-sans font-semibold">كود:</span>
+                  <span className="font-mono font-bold px-1 text-blue-950 select-text cursor-default">
                     {doc.doc_code || ''}
                   </span>
                 </div>

@@ -68,9 +68,14 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   };
 
   const handleToggleInactive = () => {
-    toggleInactive(index);
+    const currentInactive = Boolean(doc.is_inactive);
+    const targetState = !currentInactive;
+    toggleInactive(index, targetState);
     if (doc.id || doc.doc_code) {
-      toggleInactiveMutation.mutate(doc);
+      toggleInactiveMutation.mutate({
+        doctor: doc,
+        targetState,
+      });
     }
   };
 

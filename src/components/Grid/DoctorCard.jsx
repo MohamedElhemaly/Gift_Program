@@ -55,9 +55,18 @@ function DoctorCard({ doc, index }) {
   };
 
   const handleToggleInactive = () => {
-    toggleInactive(index);
+    const currentInactive = Boolean(doc.is_inactive);
+    const targetState = !currentInactive;
+
+    // 1. Instant optimistic update in Zustand store (changes card color instantly)
+    toggleInactive(index, targetState);
+
+    // 2. Persist to Supabase with TanStack Query mutation
     if (doc.id || doc.doc_code) {
-      toggleInactiveMutation.mutate(doc);
+      toggleInactiveMutation.mutate({
+        doctor: doc,
+        targetState,
+      });
     }
   };
 
@@ -67,18 +76,24 @@ function DoctorCard({ doc, index }) {
     return '';
   };
 
+  const isInactive = Boolean(doc.is_inactive);
   const hasData = Boolean(doc.doc_code || doc.name);
   const movedClass = doc.is_moved ? 'moved-highlight' : '';
-  const inactiveClass = doc.is_inactive ? 'inactive-doc' : '';
+  const inactiveClass = isInactive ? 'inactive-doc' : '';
   const hideEmptyOnScreen = !hasData && !showEmptySlotsOnScreen;
+
+  // Conditionally apply red background when is_inactive is true (Optimistic UI)
+  const cardThemeClass = isInactive
+    ? 'bg-rose-100/90 border-rose-300 hover:border-rose-400 shadow-xs ring-1 ring-rose-200'
+    : hasData
+    ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md'
+    : 'bg-slate-50/50 border-dashed border-slate-300 hover:bg-white hover:border-blue-300';
 
   return (
     <div
-      className={`grid-item relative transition-all duration-200
+      className={`grid-item relative transition-all duration-200 p-3 rounded-xl border
         ${hideEmptyOnScreen ? 'hidden print:flex' : ''}
-        ${hasData 
-          ? 'bg-white rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-400 p-3' 
-          : 'bg-slate-50/50 rounded-xl border border-dashed border-slate-300 hover:bg-white hover:border-blue-300 p-3'}
+        ${cardThemeClass}
         print:rounded-none print:shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:bg-white print:p-[6px]
         ${movedClass} ${inactiveClass}`}
       id={`item-${index}`}

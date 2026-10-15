@@ -648,10 +648,10 @@ export const doctorService = {
   },
 
   /**
-   * Toggle inactive status of doctor
+   * Set inactive status of doctor to explicit target state
    */
-  async toggleInactive(doctor) {
-    const newState = !doctor.is_inactive;
+  async setDoctorInactiveState(doctor, targetState) {
+    const newState = Boolean(targetState);
 
     if (!isSupabaseConfigured || !supabase) {
       const cached = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
@@ -689,6 +689,14 @@ export const doctorService = {
     );
 
     return { success: true, is_inactive: newState };
+  },
+
+  /**
+   * Toggle inactive status of doctor
+   */
+  async toggleInactive(doctor, forcedState = null) {
+    const targetState = forcedState !== null ? Boolean(forcedState) : !Boolean(doctor.is_inactive);
+    return await this.setDoctorInactiveState(doctor, targetState);
   },
 
   /**

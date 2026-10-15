@@ -436,28 +436,30 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
-   * Toggle Inactive with Auto-Save
+   * Toggle Inactive with Optimistic UI
    */
-  toggleInactive: async (index) => {
+  toggleInactive: (index, explicitState = null) => {
     const list = [...get().displayedDoctors];
     const doc = list[index];
-    if (!doc) return;
+    if (!doc) return false;
 
-    doc.is_inactive = !doc.is_inactive;
-    set({ displayedDoctors: list });
-    get().setAutoSaveState('saving');
+    const newState = explicitState !== null ? Boolean(explicitState) : !Boolean(doc.is_inactive);
+    doc.is_inactive = newState;
 
-    if (doc.id || doc.doc_code) {
-      try {
-        await doctorService.toggleInactive(doc);
-        get().setAutoSaveState('saved');
-      } catch (err) {
-        console.error('Failed to toggle inactive on DB:', err);
-        get().setAutoSaveState('error');
-      }
-    } else {
-      get().setAutoSaveState('saved');
+    // Also update rawDoctors so filtered or rebuilt data retains the optimistic state
+    const raw = [...get().rawDoctors];
+    const rawIndex = raw.findIndex(
+      (d) =>
+        (doc.id && d.id === doc.id) ||
+        (doc.doc_code && String(d.doc_code).trim() === String(doc.doc_code).trim())
+    );
+    if (rawIndex !== -1) {
+      raw[rawIndex] = { ...raw[rawIndex], is_inactive: newState };
     }
+
+    set({ displayedDoctors: list, rawDoctors: raw });
+    get().setAutoSaveState('saving');
+    return newState;
   },
 
   /**

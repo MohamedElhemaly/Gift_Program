@@ -253,18 +253,32 @@ export function useToggleInactiveMutation() {
   const { setAutoSaveState, rawDoctors, setRawDoctorsAndRebuild } = useDoctorStore();
 
   return useMutation({
-    mutationFn: async (doctor) => {
-      return await doctorService.toggleInactive(doctor);
+    mutationFn: async (variables) => {
+      const doc = variables?.doctor || variables;
+      const targetState =
+        variables?.targetState !== undefined
+          ? Boolean(variables.targetState)
+          : !Boolean(doc.is_inactive);
+
+      return await doctorService.setDoctorInactiveState(doc, targetState);
     },
-    onMutate: async (doctor) => {
+    onMutate: async (variables) => {
       setAutoSaveState('saving');
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.DOCTORS });
 
+      const doc = variables?.doctor || variables;
+      const targetState =
+        variables?.targetState !== undefined
+          ? Boolean(variables.targetState)
+          : !Boolean(doc.is_inactive);
+
       const previousDoctors = queryClient.getQueryData(QUERY_KEYS.DOCTORS) || rawDoctors;
-      const targetState = !doctor.is_inactive;
 
       const updatedDoctors = previousDoctors.map((d) => {
-        if ((doctor.id && d.id === doctor.id) || (doctor.doc_code && String(d.doc_code).trim() === String(doctor.doc_code).trim())) {
+        if (
+          (doc.id && d.id === doc.id) ||
+          (doc.doc_code && String(d.doc_code).trim() === String(doc.doc_code).trim())
+        ) {
           return { ...d, is_inactive: targetState };
         }
         return d;
@@ -273,7 +287,7 @@ export function useToggleInactiveMutation() {
       queryClient.setQueryData(QUERY_KEYS.DOCTORS, updatedDoctors);
       setRawDoctorsAndRebuild(updatedDoctors);
 
-      return { previousDoctors, targetState };
+      return { previousDoctors, targetState, doctor: doc };
     },
     onError: (err, variables, context) => {
       setAutoSaveState('error');
@@ -283,10 +297,20 @@ export function useToggleInactiveMutation() {
       }
       toast.error(`فشل تغيير الحالة: ${err.message || 'خطأ'}`);
     },
-    onSuccess: (_, doctor, context) => {
+    onSuccess: (_, variables, context) => {
       setAutoSaveState('saved');
-      const actionText = context?.targetState ? 'إيقاف' : 'إعادة تفعيل';
-      toast.success(`تم ${actionText} الطبيب "${doctor.name || doctor.doc_code}" بنجاح`);
+      const doc = variables?.doctor || variables;
+      const targetState =
+        context?.targetState !== undefined
+          ? context.targetState
+          : Boolean(variables?.targetState);
+      const docName = doc.name || doc.doc_code || 'الطبيب';
+
+      if (targetState) {
+        toast.success(`تم إيقاف ${docName} بنجاح (معطل)`);
+      } else {
+        toast.success(`تم إعادة تفعيل ${docName} بنجاح`);
+      }
     },
   });
 }

@@ -1,0 +1,455 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Arial', 'Tahoma', 'Segoe UI', sans-serif;
+  margin: 0;
+  padding: 20px;
+  font-size: 14px;
+  background-color: #f9f9f9;
+}
+
+/* التنسيقات العامة للوحة التحكم والأزرار */
+.controls-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.controls-heading {
+  margin-top: 0;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 10px;
+  display: inline-block;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* النوافذ المنبثقة (Modals) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  width: 450px;
+  max-width: 95%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* تنسيقات التعديل اليدوي المباشر */
+[contenteditable="true"] {
+  outline: none;
+  min-height: 1.2em;
+  min-width: 20px;
+  border-radius: 2px;
+  transition: background-color 0.15s ease, outline 0.15s ease;
+}
+
+[contenteditable="true"]:hover {
+  background-color: #fff3cd;
+  cursor: text;
+  outline: 1px dashed #ffc107;
+}
+
+[contenteditable="true"]:focus {
+  background-color: #fff3cd;
+  outline: 2px solid #007bff;
+}
+
+/* إظهار نصوص توضيحية (Placeholders) للحقول الفارغة على الشاشة */
+[contenteditable="true"]:empty:before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+  font-size: 0.88em;
+  font-weight: normal;
+  font-style: normal;
+  opacity: 0.85;
+}
+
+[contenteditable="true"]:focus:empty:before {
+  opacity: 0.35;
+}
+
+/* الألوان الدلالية العصرية على الشاشة (مع الحفاظ على الألوان الأصلية في الطباعة) */
+.modified {
+  background-color: #fef9c3 !important; /* أصفر عنبري ناعم ومريح للعين */
+  box-shadow: inset 0 0 0 1px #facc15;
+}
+
+.moved-highlight {
+  background-color: #fff1f2 !important; /* وردي ناعم أنيق */
+  box-shadow: inset 0 0 0 1px #fda4af;
+}
+
+.updated-stats {
+  background-color: #ecfdf5 !important; /* أخضر ناعم حديث */
+  box-shadow: inset 0 0 0 1px #6ee7b7;
+}
+
+.inactive-doc {
+  background-color: #fef2f2 !important; /* أحمر رمادي معتم */
+  opacity: 0.7;
+  filter: grayscale(40%);
+}
+
+/* شريط التمرير المخصص لكل بطاقة طبيب (Scrollbar داخل الصندوق) */
+.custom-card-scroll {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.custom-card-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-card-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.custom-card-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 4px;
+}
+
+.custom-card-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+@media print {
+  .custom-card-scroll {
+    overflow: hidden !important;
+  }
+}
+
+/* الملاحظات (النقل والدمج) */
+.moved-text {
+  font-size: 11px;
+  font-weight: bold;
+  margin-top: 4px;
+  background: #fff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: inline-block;
+  border: 1px solid;
+  line-height: 1.2;
+}
+
+.note-moved {
+  color: #d9534f;
+  border-color: #d9534f;
+}
+
+.note-merged {
+  color: #800080;
+  border-color: #800080;
+}
+
+/* هيكل صفحة الطباعة A4 بدقة */
+.page {
+  background: white;
+  width: 210mm;
+  height: 297mm;
+  padding: 10mm;
+  margin: 0 auto 20px auto;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  page-break-after: always;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* الترويسة الأصلية مخصصة للطباعة فقط */
+.print-original-header {
+  display: none !important;
+}
+
+@media print {
+  .print-original-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    font-weight: bold !important;
+    font-size: 18px !important;
+    margin-bottom: 10px !important;
+    padding: 0 20px !important;
+    height: 10mm !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-original-header div {
+    flex: 1 !important;
+    text-align: center !important;
+  }
+
+  .print-original-header div:first-child {
+    text-align: right !important;
+  }
+
+  .print-original-header div:last-child {
+    text-align: left !important;
+  }
+}
+
+/* شبكة الأطباء (21 عنصر: 3 أعمدة × 7 صفوف) */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  height: 255mm;
+  border-top: 2px solid black;
+  border-right: 2px solid black;
+  background: white;
+  box-sizing: border-box;
+}
+
+.grid-item {
+  border-bottom: 2px solid black;
+  border-left: 2px solid black;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: white;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 3px;
+}
+
+/* أزرار الإجراءات داخل المربع */
+.left-actions {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.action-btn {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  font-weight: bold;
+  color: #333;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background: #e0e0e0;
+}
+
+.code-box {
+  border: 1px solid black;
+  min-width: 35px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: bold;
+  background: #f4f4f4;
+  padding: 0 4px;
+  cursor: text;
+  user-select: text;
+  vertical-align: middle;
+}
+
+.boxes-wrapper {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.box {
+  border: 1px solid black;
+  width: 45px;
+  height: 25px;
+  line-height: 23px;
+  text-align: center;
+  display: inline-block;
+  font-weight: bold;
+  cursor: text;
+  user-select: text;
+  vertical-align: middle;
+}
+
+.doc-info {
+  text-align: right;
+  line-height: 1.3;
+  flex-grow: 1;
+  margin-top: 2px;
+}
+
+.doc-name {
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.bottom-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-top: auto;
+  font-weight: bold;
+}
+
+/* إعدادات الطباعة الدقيقة لتطابق A4 الأصلي تماماً */
+@media print {
+  body {
+    padding: 0 !important;
+    background: white !important;
+    margin: 0 !important;
+  }
+
+  .no-print,
+  .controls,
+  .controls-card,
+  .modal-overlay,
+  .action-btn,
+  nav {
+    display: none !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
+
+  .page {
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    padding: 10mm !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    overflow: hidden !important;
+    background: white !important;
+  }
+
+  .header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    height: 10mm !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    margin-bottom: 10px !important;
+    padding: 0 20px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .grid-container {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-rows: repeat(7, 1fr) !important;
+    height: 255mm !important;
+    border-top: 2px solid black !important;
+    border-right: 2px solid black !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    background: white !important;
+    gap: 0 !important;
+  }
+
+  .grid-item {
+    border: none !important;
+    border-bottom: 2px solid black !important;
+    border-left: 2px solid black !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 6px !important;
+    margin: 0 !important;
+    background: white !important;
+  }
+
+  .box {
+    border: 1px solid black !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 45px !important;
+    height: 25px !important;
+    background: white !important;
+  }
+
+  .code-box {
+    border: 1px solid black !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #f4f4f4 !important;
+    min-width: 35px !important;
+    height: 22px !important;
+    font-size: 11px !important;
+  }
+
+  /* الحفاظ على ألوان التمييز عند الطباعة بدقة */
+  .modified {
+    background-color: #ffeb3b !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .moved-highlight {
+    background-color: #ffe6e6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .updated-stats {
+    background-color: #d4edda !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* إخفاء محتوى الطبيب الموقوف وإبقاء الخلية فارغة تماماً */
+  .inactive-doc > div {
+    display: none !important;
+  }
+
+  .inactive-doc {
+    background-color: transparent !important;
+  }
+
+  /* إخفاء نصوص الـ Placeholders تماماً عند الطباعة لتبقى الخلايا فارغة */
+  [contenteditable="true"]:empty:before {
+    display: none !important;
+    content: "" !important;
+  }
+}

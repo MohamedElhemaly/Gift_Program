@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>برنامج طباعة داتا الأطباء (النسخة السريعة والشاملة)</title>
+    <!-- مكتبة قراءة الإكسيل -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; font-size: 14px; background: #f9f9f9; }
+        
+        /* لوحة التحكم */
+        .controls { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .controls h3 { margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; display: inline-block; font-size: 16px; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: inline-block; width: 220px; font-weight: bold; }
+        
+        /* الأزرار */
+        .btn { padding: 10px 20px; font-size: 14px; cursor: pointer; color: white; border: none; border-radius: 4px; font-weight: bold; margin-left: 5px; margin-top: 10px; transition: 0.2s;}
+        .btn-primary { background: #007bff; } .btn-primary:hover { background: #0056b3; }
+        .btn-success { background: #28a745; } .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: black; } .btn-warning:hover { background: #e0a800; }
+        .btn-info { background: #17a2b8; } .btn-info:hover { background: #117a8b; }
+        .btn-secondary { background: #6c757d; } .btn-secondary:hover { background: #5a6268; }
+        
+        hr { margin: 20px 0; border: 0; border-top: 1px solid #ddd; }
+        #statusMessage { font-weight: bold; margin-top: 10px; display: none; padding: 10px; border-radius: 4px; }
+
+        /* النوافذ المنبثقة (Modals) */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; max-width: 95%; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-content h3 { margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .modal-content select, .modal-content input { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; font-size: 14px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+
+        /* تنسيقات التعديل اليدوي */
+        [contenteditable="true"] { outline: none; min-height: 1.2em; min-width: 20px; border-radius: 2px; }
+        [contenteditable="true"]:hover { background-color: #fff3cd; cursor: text; outline: 1px dashed #ffc107; }
+        [contenteditable="true"]:focus { background-color: #fff3cd; outline: 2px solid #007bff; }
+        
+        /* الألوان الدلالية للمربعات */
+        .modified { background-color: #ffeb3b !important; } /* أصفر للتعديل اليدوي */
+        .moved-highlight { background-color: #ffe6e6 !important; } /* أحمر فاتح للمنقول */
+        .updated-stats { background-color: #d4edda !important; } /* أخضر للتحديث الآلي */
+        .inactive-doc { background-color: #ffcdd2 !important; opacity: 0.8; } /* أحمر للطبيب الموقوف */
+        
+        /* الملاحظات (النقل والدمج) */
+        .moved-text { font-size: 11px; font-weight: bold; margin-top: 4px; background: #fff; padding: 2px 4px; border-radius: 3px; display: inline-block; border: 1px solid; line-height: 1.2; }
+        .note-moved { color: #d9534f; border-color: #d9534f; }
+        .note-merged { color: #800080; border-color: #800080; }
+        
+        /* هيكل الصفحة للطباعة */
+        .page { background: white; width: 210mm; height: 297mm; padding: 10mm; margin: 0 auto 20px auto; box-shadow: 0 0 5px rgba(0,0,0,0.1); page-break-after: always; position: relative; overflow: hidden; }
+        
+        /* الترويسة (محافظة - مدينة - منطقة) */
+        .header { display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; margin-bottom: 10px; padding: 0 20px; height: 10mm; align-items: center; }
+        .header div { flex: 1; text-align: center; }
+        .header div:first-child { text-align: right; }
+        .header div:last-child { text-align: left; }
+        
+        /* شبكة الأطباء */
+        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(7, 1fr); height: 255mm; border-top: 2px solid black; border-right: 2px solid black; background: white; }
+        .grid-item { border-bottom: 2px solid black; border-left: 2px solid black; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+        
+        .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3px; }
+        
+        /* أزرار الإجراءات داخل المربع */
+        .left-actions { display: flex; gap: 3px; align-items: center; }
+        .action-btn { background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-size: 13px; padding: 2px 4px; font-weight: bold; color: #333; }
+        .action-btn:hover { background: #e0e0e0; }
+        
+        .code-box { border: 1px solid black; min-width: 35px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; background: #f4f4f4; padding: 0 4px; }
+        
+        .boxes-wrapper { display: flex; gap: 5px; justify-content: flex-end; }
+        .box { border: 1px solid black; width: 45px; height: 25px; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        
+        .doc-info { text-align: right; line-height: 1.3; flex-grow: 1; margin-top: 2px; }
+        .doc-name { font-weight: bold; font-size: 15px; }
+        .bottom-row { display: flex; justify-content: space-between; font-size: 12px; margin-top: auto; font-weight: bold; }
+        
+        #printOptions { display: none; margin-right: 15px; padding-right: 15px; border-right: 2px solid #ccc; }
+        #saveBtn, #blankPageBtn { display: none; }
+        #pageRange { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 180px; text-align: center; font-weight: bold;}
+
+        /* إعدادات الطباعة */
+        @media print {
+            body { padding: 0; background: white; margin: 0; }
+            .controls, .modal-overlay, .action-btn { display: none !important; }
+            @page { size: A4 portrait; margin: 0 !important; }
+            .page { margin: 0 !important; box-shadow: none; border: none; width: 210mm; height: 297mm; page-break-after: always; page-break-inside: avoid; }
+            
+            /* الحفاظ على ألوان التمييز عند الطباعة */
+            .modified { background-color: #ffeb3b !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .moved-highlight { background-color: #ffe6e6 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .updated-stats { background-color: #d4edda !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            
+            /* إخفاء محتوى الطبيب الموقوف وإبقاء الخلية فارغة */
+            .inactive-doc > div { display: none !important; }
+            .inactive-doc { background-color: transparent !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- لوحة التحكم -->
+    <div class="controls">
+        <h3>1. إنشاء تقرير جديد من الإكسيل</h3>
+        <div class="input-group"><label>شيت الدكاترة: </label> <input type="file" id="fileDocs" accept=".xlsx, .xls"></div>
+        <div class="input-group"><label>شيت القديم: </label> <input type="file" id="fileOld" accept=".xlsx, .xls"></div>
+        <div class="input-group"><label>شيت الجديد: </label> <input type="file" id="fileNew" accept=".xlsx, .xls"></div>
+        <button class="btn btn-primary" onclick="generateFromExcel()" id="mainBtn">إنشاء التقرير</button>
+        
+        <hr>
+        
+        <h3>2. استكمال عمل محفوظ سابقاً</h3>
+        <div class="input-group"><label>ارفع ملف الحفظ (.json): </label> <input type="file" id="fileLoad" accept=".json" onchange="loadProgress(event)"></div>
+
+        <hr>
+
+        <h3>3. تحديث أرقام الحالات (للتحديث فقط)</h3>
+        <div class="input-group"><label>شيت القديم: </label> <input type="file" id="fileUpdateOld" accept=".xlsx, .xls"></div>
+        <div class="input-group"><label>شيت الجديد: </label> <input type="file" id="fileUpdateNew" accept=".xlsx, .xls"></div>
+        <button class="btn btn-secondary" onclick="updateStatsOnly()">🔄 تحديث الحالات فقط</button>
+
+        <div id="statusMessage">جاري المعالجة...</div>
+        <hr>
+
+        <!-- أزرار الإجراءات بعد العرض -->
+        <div id="actionButtons">
+            <button class="btn btn-warning" id="saveBtn" onclick="saveProgress()">💾 حفظ نسخة (.json)</button>
+            <button class="btn btn-info" id="blankPageBtn" onclick="addBlankPage()">➕ إضافة صفحة فارغة</button>
+            
+            <div id="printOptions">
+                <label>اختر الصفحات: </label>
+                <input type="text" id="pageRange" value="الكل" placeholder="مثال: 1-3">
+                <button class="btn btn-success" id="pdfBtn" onclick="exportPDF()">📥 طباعة / PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة النقل -->
+    <div id="moveModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>🔄 نقل الطبيب</h3>
+            <label>اختر الوجهة من القائمة:</label>
+            <select id="moveSelect" onchange="toggleNewInputs()"></select>
+            
+            <div id="newLocationDiv" style="display: none;">
+                <label>المحافظة الجديدة:</label><input type="text" id="newGvrInput" placeholder="مثال: البحيرة">
+                <label>المدينة / المركز الجديد:</label><input type="text" id="newCityInput" placeholder="مثال: دمنهور">
+                <label>المنطقة الجديدة:</label><input type="text" id="newRegionInput" placeholder="مثال: شبرا">
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn" style="background: #ccc; color: black;" onclick="closeModal('moveModal')">إلغاء</button>
+                <button class="btn btn-primary" onclick="confirmMove()">نقل الآن</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة الدمج المعدلة -->
+    <div id="combineModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="border-bottom: 2px solid purple; color: purple;">🔗 دمج طبيبين</h3>
+            <p style="font-weight: bold; margin-bottom: 5px;">سيتم سحب بيانات الطبيب المختار وجمع إحصائياته مع الطبيب الحالي وسيتم تفريغ خليته:</p>
+            <label>أدخل كود الطبيب الذي تريد سحبه:</label>
+            <input type="text" id="combineInput" placeholder="اكتب كود الطبيب هنا..." style="font-weight:bold; text-align:center; font-size:16px;">
+            
+            <div class="modal-actions">
+                <button class="btn" style="background: #ccc; color: black;" onclick="closeModal('combineModal')">إلغاء</button>
+                <button class="btn" style="background: purple; color: white;" onclick="confirmCombine()">تأكيد الدمج</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- حاوية التقرير -->
+    <div id="reportContainer"></div>
+
+    <script>
+        let globalData = [];
+        let currentActionIndex = -1;
+
+        // ==========================================
+        // نظام التنبيهات
+        // ==========================================
+        function showStatus(msg, isError = false) {
+            const el = document.getElementById('statusMessage');
+            el.style.display = 'block';
+            el.innerText = msg;
+            el.style.backgroundColor = isError ? '#f8d7da' : '#d4edda';
+            el.style.color = isError ? '#721c24' : '#155724';
+            el.style.border = `1px solid ${isError ? '#f5c6cb' : '#c3e6cb'}`;
+        }
+        function hideStatus() { document.getElementById('statusMessage').style.display = 'none'; }
+
+        // ==========================================
+        // 1. خوارزمية قراءة الإكسيل السريعة
+        // ==========================================
+        const COL_DEFS = {
+            code: ['doctor code', 'doctor co', 'id', 'code', 'كود'],
+            name: ['doctor name', 'name', 'اسم'],
+            specialty: ['doctor spec', 'specialty', 'spec', 'تخصص'], // تم إزالة 'condition' من هنا
+            address: ['address', 'العنوان'],
+            gvr: ['governe', 'governorate', 'gov', 'gvr', 'محافظة', 'محافظه'],
+            city: ['city', 'المدينة', 'مدينة', 'مركز', 'center'],
+            region: ['region', 'المنطقة'],
+            mobile: ['mobile', 'موبايل', 'رقم'],
+            home_tel: ['home tel', 'تليفون', 'ارضي'],
+            count_general: ['patient count', 'حالات'],
+            count_old: ['old', 'قديم'],
+            count_new: ['new', 'جديد']
+        };
+
+        function getColumnMapping(dataArray) {
+            let map = {};
+            let sampleRow = dataArray.find(r => Object.keys(r).length > 2);
+            if (!sampleRow) return map;
+            
+            let rowKeys = Object.keys(sampleRow).map(k => ({ orig: k, low: k.toLowerCase().trim() }));
+
+            for (let field in COL_DEFS) {
+                let possibles = COL_DEFS[field];
+                let match = rowKeys.find(rk => possibles.some(p => rk.low === p.toLowerCase())) 
+                         || rowKeys.find(rk => possibles.some(p => rk.low.includes(p.toLowerCase())));
+                if (match) map[field] = match.orig;
+            }
+            return map;
+        }
+
+        async function readExcel(fileInput) {
+            const file = fileInput.files[0];
+            if (!file) return [];
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                        resolve(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]));
+                    } catch (error) { reject(error); }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        async function generateFromExcel() {
+            try {
+                if (typeof XLSX === 'undefined') { alert("تأكد من اتصالك بالإنترنت لتحميل المكتبة."); return; }
+                showStatus("جاري استخراج البيانات وبناء التقرير...");
+                
+                setTimeout(async () => {
+                    const docsData = await readExcel(document.getElementById('fileDocs'));
+                    const oldData = await readExcel(document.getElementById('fileOld'));
+                    const newData = await readExcel(document.getElementById('fileNew'));
+
+                    if (!docsData.length && !oldData.length && !newData.length) { 
+                        alert("برجاء رفع شيت واحد على الأقل!"); hideStatus(); return; 
+                    }
+
+                    const docsMapConf = getColumnMapping(docsData);
+                    const oldMapConf = getColumnMapping(oldData);
+                    const newMapConf = getColumnMapping(newData);
+                    const doctorsMap = {};
+
+                    function processDataset(dataset, mapConf, type) {
+                        dataset.forEach(row => {
+                            let idCode = row[mapConf.code];
+                            if (idCode === undefined || idCode === null) return;
+                            idCode = String(idCode).trim();
+                            if (idCode === '') return;
+
+                            if (!doctorsMap[idCode]) {
+                                let n = row[mapConf.name] || '';
+                                if (n && !String(n).includes("أ.د/")) n = "أ.د/ " + n;
+                                doctorsMap[idCode] = { 
+                                    doc_code: idCode, name: n, 
+                                    specialty: row[mapConf.specialty] || '', address: row[mapConf.address] || '', 
+                                    gvr: row[mapConf.gvr] || '', city: row[mapConf.city] || '', region: row[mapConf.region] || '', 
+                                    mobile: row[mapConf.mobile] || '', home_tel: row[mapConf.home_tel] || '', 
+                                    old_stats: '', new_stats: '', 
+                                    is_moved: false, moved_from: '', is_inactive: false, merged_codes: [] 
+                                };
+                                doctorsMap[idCode].pageGvr = doctorsMap[idCode].gvr;
+                                doctorsMap[idCode].pageCity = doctorsMap[idCode].city;
+                                doctorsMap[idCode].pageRegion = doctorsMap[idCode].region;
+                            }
+                            
+                            let countKey = type === 'docs' ? mapConf.count_general : (type === 'old' ? mapConf.count_old : mapConf.count_new);
+                            if (!countKey && type === 'old') countKey = mapConf.count_general; 
+                            if (!countKey && type === 'new') countKey = mapConf.count_general;
+                            
+                            let countVal = row[countKey];
+                            if (countVal !== undefined && countVal !== null) {
+                                if (type === 'docs' || type === 'old') doctorsMap[idCode].old_stats = countVal;
+                                else doctorsMap[idCode].new_stats = countVal;
+                            }
+                        });
+                    }
+
+                    processDataset(docsData, docsMapConf, 'docs');
+                    processDataset(oldData, oldMapConf, 'old');
+                    processDataset(newData, newMapConf, 'new');
+
+                    globalData = Object.values(doctorsMap);
+                    rebuildData(); 
+                    hideStatus();
+                }, 50);
+            } catch (err) { alert("حدث خطأ: " + err); hideStatus(); }
+        }
+
+        async function updateStatsOnly() {
+            if (globalData.length === 0) { alert("أنشئ تقرير أولاً أو ارفع ملف حفظ!"); return; }
+            showStatus("جاري التحديث...");
+            
+            setTimeout(async () => {
+                let updateCounter = 0;
+                try {
+                    let oldData = await readExcel(document.getElementById('fileUpdateOld'));
+                    let newData = await readExcel(document.getElementById('fileUpdateNew'));
+                    
+                    let oldMapConf = getColumnMapping(oldData);
+                    let newMapConf = getColumnMapping(newData);
+
+                    let oMap = {}, nMap = {};
+                    oldData.forEach(r => { if(r[oldMapConf.code]) oMap[r[oldMapConf.code]] = r[oldMapConf.count_old] || r[oldMapConf.count_general]; });
+                    newData.forEach(r => { if(r[newMapConf.code]) nMap[r[newMapConf.code]] = r[newMapConf.count_new] || r[newMapConf.count_general]; });
+
+                    globalData.forEach(doc => {
+                        let c = doc.doc_code;
+                        if (c) {
+                            if (oMap[c] !== undefined && doc.old_stats != oMap[c]) {
+                                doc.old_stats = oMap[c]; doc.old_stats_updated = true; doc.old_stats_modified = false; updateCounter++;
+                            }
+                            if (nMap[c] !== undefined && doc.new_stats != nMap[c]) {
+                                doc.new_stats = nMap[c]; doc.new_stats_updated = true; doc.new_stats_modified = false; updateCounter++;
+                            }
+                        }
+                    });
+
+                    renderGrid(); hideStatus();
+                    alert(updateCounter > 0 ? `تم تحديث ${updateCounter} حالة بنجاح.` : "لم يتم العثور على أرقام جديدة تختلف عن الحالية.");
+                } catch(e) { alert("خطأ في التحديث: " + e); hideStatus(); }
+            }, 50);
+        }
+
+        // ==========================================
+        // 2. الفرز وبناء الصفحات
+        // ==========================================
+        function rebuildData() {
+            const groups = {};
+            globalData.forEach(doc => {
+                let key = `${doc.pageGvr || 'بدون محافظة'}::${doc.pageCity || 'بدون مدينة'}::${doc.pageRegion || 'بدون منطقة'}`;
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(doc);
+            });
+
+            let newData = [];
+            Object.keys(groups).sort().forEach(key => {
+                let gDocs = groups[key];
+                let cGvr = gDocs[0].pageGvr || '', cCity = gDocs[0].pageCity || '', cReg = gDocs[0].pageRegion || '';
+                let cGvrMod = gDocs[0].pageGvr_modified, cCityMod = gDocs[0].pageCity_modified, cRegMod = gDocs[0].pageRegion_modified;
+                
+                while (gDocs.length > 0) {
+                    let last = gDocs[gDocs.length - 1];
+                    if (!last.name && !last.specialty && !last.address && !last.old_stats && !last.new_stats && !last.doc_code) gDocs.pop();
+                    else break;
+                }
+
+                let rem = gDocs.length % 21;
+                let needed = (gDocs.length === 0) ? 21 : (rem !== 0 ? 21 - rem : 0);
+                for (let i = 0; i < needed; i++) {
+                    gDocs.push({
+                        pageGvr: cGvr, pageCity: cCity, pageRegion: cReg,
+                        pageGvr_modified: cGvrMod, pageCity_modified: cCityMod, pageRegion_modified: cRegMod,
+                        name: '', specialty: '', address: '', mobile: '', home_tel: '', old_stats: '', new_stats: '', counter: '', doc_code: '', is_moved: false, moved_from: '', is_inactive: false, merged_codes: []
+                    });
+                }
+                
+                gDocs.forEach((d, idx) => { if(d.doc_code || d.name) d.counter = idx + 1; else d.counter = ''; });
+                newData = newData.concat(gDocs);
+            });
+
+            globalData = newData; 
+            renderGrid();
+        }
+
+        // ==========================================
+        // 3. محرك الرسم السريع
+        // ==========================================
+        function renderGrid() {
+            let htmlArr = [];
+            let pageNum = 1;
+            
+            for (let i = 0; i < globalData.length; i += 21) {
+                const pageDocs = globalData.slice(i, i + 21);
+                const gvr = pageDocs[0].pageGvr || '', city = pageDocs[0].pageCity || '', region = pageDocs[0].pageRegion || '';
+                const mGvr = pageDocs[0].pageGvr_modified ? 'modified' : '';
+                const mCity = pageDocs[0].pageCity_modified ? 'modified' : '';
+                const mReg = pageDocs[0].pageRegion_modified ? 'modified' : '';
+
+                htmlArr.push(`
+                    <div class="page" id="page-${pageNum}">
+                        <div style="font-size:10px; color:#999; margin-bottom:5px; height:5mm;">صفحة ${pageNum}</div>
+                        <div class="header">
+                            <div class="${mGvr}" contenteditable="true" data-header="pageGvr" data-idx="${i}" title="المحافظة (انقر للتعديل وسيتم الفرز تلقائياً)">${gvr}</div>
+                            <div class="${mCity}" contenteditable="true" data-header="pageCity" data-idx="${i}" title="المدينة (انقر للتعديل وسيتم الفرز تلقائياً)">${city}</div>
+                            <div class="${mReg}" contenteditable="true" data-header="pageRegion" data-idx="${i}" title="المنطقة (انقر للتعديل وسيتم الفرز تلقائياً)">${region}</div>
+                        </div>
+                        <div class="grid-container">
+                `);
+
+                for (let j = 0; j < 21; j++) {
+                    const doc = pageDocs[j], idx = i + j;
+                    const mod = (f) => doc[f + '_updated'] ? 'updated-stats' : (doc[f + '_modified'] ? 'modified' : '');
+                    
+                    const movedNote = doc.is_moved ? `<div class="moved-text note-moved">كان في: ${doc.moved_from}</div>` : '';
+                    const mergedNote = (doc.merged_codes && doc.merged_codes.length > 0) ? `<div class="moved-text note-merged">+ مدمج مع: ${doc.merged_codes.join(', ')}</div>` : '';
+                    
+                    const inactiveClass = doc.is_inactive ? 'inactive-doc' : '';
+                    const movedClass = doc.is_moved ? 'moved-highlight' : '';
+
+                    htmlArr.push(`
+                        <div class="grid-item ${movedClass} ${inactiveClass}" id="item-${idx}">
+                            <div class="top-row">
+                                <div class="left-actions">
+                                    <button class="action-btn" data-action="move" data-idx="${idx}" title="نقل الطبيب لصفحة أخرى">🔄</button>
+                                    <button class="action-btn" style="color:purple;" data-action="combine" data-idx="${idx}" title="دمج طبيب آخر مع هذا الطبيب">🔗</button>
+                                    <button class="action-btn" style="color:red;" data-action="toggle" data-idx="${idx}" title="إيقاف/تفعيل الطبيب (سيتم إخفاؤه في الطباعة)">🚫</button>
+                                    <div class="code-box ${mod('doc_code')}" contenteditable="true" data-field="doc_code" data-idx="${idx}">${doc.doc_code || ''}</div>
+                                </div>
+                                <div class="boxes-wrapper">
+                                    <div class="box ${mod('old_stats')}" contenteditable="true" data-field="old_stats" data-idx="${idx}" title="القديم">${doc.old_stats || ''}</div>
+                                    <div class="box ${mod('new_stats')}" contenteditable="true" data-field="new_stats" data-idx="${idx}" title="الجديد">${doc.new_stats || ''}</div>
+                                    <div class="box ${mod('counter')}" contenteditable="true" data-field="counter" data-idx="${idx}" title="المسلسل">${doc.counter || ''}</div>
+                                </div>
+                            </div>
+                            <div class="doc-info">
+                                <div class="doc-name ${mod('name')}" contenteditable="true" data-field="name" data-idx="${idx}">${doc.name || ''}</div>
+                                <div class="${mod('specialty')}" contenteditable="true" data-field="specialty" data-idx="${idx}">${doc.specialty || ''}</div>
+                                <div class="${mod('address')}" contenteditable="true" data-field="address" data-idx="${idx}">${doc.address || ''}</div>
+                                ${movedNote} ${mergedNote}
+                            </div>
+                            <div class="bottom-row">
+                                <div class="${mod('mobile')}" contenteditable="true" data-field="mobile" data-idx="${idx}">${doc.mobile || ''}</div>
+                                <div class="${mod('home_tel')}" contenteditable="true" data-field="home_tel" data-idx="${idx}">${doc.home_tel || ''}</div>
+                            </div>
+                        </div>`);
+                }
+                htmlArr.push(`</div></div>`); pageNum++;
+            }
+            
+            document.getElementById('reportContainer').innerHTML = htmlArr.join('');
+            document.getElementById('saveBtn').style.display = 'inline-block';
+            document.getElementById('blankPageBtn').style.display = 'inline-block';
+            document.getElementById('printOptions').style.display = 'inline-block';
+        }
+
+        // ==========================================
+        // 4. إدارة الأحداث المركزية
+        // ==========================================
+        const container = document.getElementById('reportContainer');
+
+        container.addEventListener('click', function(e) {
+            let btn = e.target.closest('.action-btn');
+            if (!btn) return;
+            let action = btn.getAttribute('data-action');
+            let idx = parseInt(btn.getAttribute('data-idx'));
+            
+            if (action === 'move') openMoveModal(idx);
+            else if (action === 'combine') openCombineModal(idx);
+            else if (action === 'toggle') toggleInactiveFast(idx);
+        });
+
+        container.addEventListener('focusout', function(e) {
+            if (e.target.hasAttribute('contenteditable')) {
+                let idx = parseInt(e.target.getAttribute('data-idx'));
+                let val = e.target.innerText.trim();
+                
+                if (e.target.hasAttribute('data-header')) {
+                    let field = e.target.getAttribute('data-header');
+                    updatePageHeaderFast(idx, field, val, e.target);
+                } else {
+                    let field = e.target.getAttribute('data-field');
+                    updateItemFast(idx, field, val, e.target);
+                }
+            }
+        });
+
+        // ==========================================
+        // 5. التحديثات المباشرة
+        // ==========================================
+        function toggleInactiveFast(idx) {
+            globalData[idx].is_inactive = !globalData[idx].is_inactive;
+            let itemDiv = document.getElementById(`item-${idx}`);
+            if (itemDiv) {
+                if (globalData[idx].is_inactive) itemDiv.classList.add('inactive-doc');
+                else itemDiv.classList.remove('inactive-doc');
+            }
+        }
+
+        function updateItemFast(idx, field, newVal, el) {
+            let oldVal = String(globalData[idx][field] || '').trim();
+            if (newVal !== oldVal) {
+                globalData[idx][field] = newVal;
+                globalData[idx][field + '_modified'] = true;
+                globalData[idx][field + '_updated'] = false;
+                el.classList.remove('updated-stats');
+                el.classList.add('modified');
+            }
+        }
+
+        function updatePageHeaderFast(startIndex, field, newVal, el) {
+            let oldVal = String(globalData[startIndex][field] || '').trim();
+            if (newVal !== oldVal) {
+                for (let i = 0; i < 21; i++) {
+                    if (globalData[startIndex + i]) {
+                        globalData[startIndex + i][field] = newVal;
+                        globalData[startIndex + i][field + '_modified'] = true;
+                    }
+                }
+                el.classList.add('modified');
+                rebuildData();
+            }
+        }
+
+        // ==========================================
+        // 6. النوافذ المنبثقة والعمليات (Modals)
+        // ==========================================
+        function closeModal(modalId) { 
+            document.getElementById(modalId).style.display = 'none'; 
+            currentActionIndex = -1; 
+        }
+
+        // --- النقل ---
+        function openMoveModal(index) {
+            currentActionIndex = index;
+            let uLocs = new Set();
+            globalData.forEach(d => { 
+                if(d.pageGvr || d.pageCity || d.pageRegion) uLocs.add(`${d.pageGvr||''}::${d.pageCity||''}::${d.pageRegion||''}`); 
+            });
+            let sel = document.getElementById('moveSelect');
+            
+            let htmlArr = ['<option value="">-- اختر الوجهة --</option>'];
+            Array.from(uLocs).sort().forEach(loc => {
+                let p = loc.split('::'); 
+                htmlArr.push(`<option value="${loc}">${p[0]||'بدون محافظة'} - ${p[1]||'بدون مدينة'} - ${p[2]||'بدون منطقة'}</option>`);
+            });
+            htmlArr.push('<option value="NEW" style="color:blue;">➕ إضافة وجهة جديدة...</option>');
+            
+            sel.innerHTML = htmlArr.join('');
+            document.getElementById('newLocationDiv').style.display = 'none';
+            document.getElementById('newGvrInput').value = '';
+            document.getElementById('newCityInput').value = '';
+            document.getElementById('newRegionInput').value = '';
+            document.getElementById('moveModal').style.display = 'flex';
+        }
+
+        function toggleNewInputs() {
+            let isNew = document.getElementById('moveSelect').value === 'NEW';
+            document.getElementById('newLocationDiv').style.display = isNew ? 'block' : 'none';
+        }
+
+        function confirmMove() {
+            if (currentActionIndex === -1) return;
+            let val = document.getElementById('moveSelect').value, g="", c="", r="";
+            if (!val) { alert("برجاء اختيار الوجهة!"); return; }
+            if (val === 'NEW') {
+                g = document.getElementById('newGvrInput').value.trim();
+                c = document.getElementById('newCityInput').value.trim();
+                r = document.getElementById('newRegionInput').value.trim();
+                if(!g && !c && !r) { alert("برجاء إدخال بيانات الوجهة الجديدة!"); return; }
+            } else { 
+                let p = val.split('::'); g = p[0]; c = p[1]; r = p[2]; 
+            }
+            
+            let doc = globalData[currentActionIndex];
+            doc.is_moved = true; 
+            doc.moved_from = `${doc.pageGvr||''} - ${doc.pageCity||''} - ${doc.pageRegion||''}`;
+            doc.pageGvr = g; doc.pageCity = c; doc.pageRegion = r;
+            doc.pageGvr_modified = true; doc.pageCity_modified = true; doc.pageRegion_modified = true;
+            
+            closeModal('moveModal'); 
+            rebuildData(); 
+        }
+
+        // --- الدمج عبر إدخال الكود مباشرة ---
+        function openCombineModal(index) {
+            currentActionIndex = index;
+            document.getElementById('combineInput').value = '';
+            document.getElementById('combineModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('combineInput').focus(), 100);
+        }
+
+        function confirmCombine() {
+            if (currentActionIndex === -1) return;
+            let inputCode = document.getElementById('combineInput').value.trim();
+            
+            if (!inputCode) { 
+                alert("برجاء إدخال كود الطبيب!"); 
+                return; 
+            }
+            
+            let targetDoc = globalData[currentActionIndex];
+            
+            if (String(targetDoc.doc_code).trim() === inputCode) {
+                alert("لا يمكنك دمج الطبيب مع نفسه!");
+                return;
+            }
+
+            let sourceIndex = globalData.findIndex(d => String(d.doc_code).trim() === inputCode);
+            
+            if (sourceIndex === -1) {
+                alert("لم يتم العثور على طبيب يحمل هذا الكود!");
+                return;
+            }
+
+            let sourceDoc = globalData[sourceIndex];
+            
+            targetDoc.old_stats = (parseInt(targetDoc.old_stats)||0) + (parseInt(sourceDoc.old_stats)||0);
+            targetDoc.new_stats = (parseInt(targetDoc.new_stats)||0) + (parseInt(sourceDoc.new_stats)||0);
+            targetDoc.old_stats_modified = true; 
+            targetDoc.new_stats_modified = true; 
+            targetDoc.old_stats_updated = false; 
+            targetDoc.new_stats_updated = false;
+            
+            if (!targetDoc.merged_codes) targetDoc.merged_codes = [];
+            if (sourceDoc.doc_code) targetDoc.merged_codes.push(sourceDoc.doc_code);
+            if (sourceDoc.merged_codes && sourceDoc.merged_codes.length) targetDoc.merged_codes.push(...sourceDoc.merged_codes);
+            
+            Object.assign(sourceDoc, { 
+                doc_code:'', name:'', specialty:'', address:'', old_stats:'', new_stats:'', mobile:'', home_tel:'', 
+                is_inactive:false, is_moved:false, moved_from:'', merged_codes:[] 
+            });
+            
+            closeModal('combineModal'); 
+            renderGrid();
+        }
+
+        // ==========================================
+        // 7. أدوات إضافية
+        // ==========================================
+        function addBlankPage() {
+            let g = prompt("اسم المحافظة:", "صفحة إضافية"), c = prompt("اسم المدينة / المركز:", "مدينة إضافية"), r = prompt("اسم المنطقة:", "فارغة");
+            if(g===null || c===null || r===null) return;
+            
+            for (let i = 0; i < 21; i++) {
+                globalData.push({ 
+                    pageGvr:g.trim(), pageCity:c.trim(), pageRegion:r.trim(), 
+                    pageGvr_modified:true, pageCity_modified:true, pageRegion_modified:true, 
+                    name:'', specialty:'', address:'', mobile:'', home_tel:'', old_stats:'', new_stats:'', counter:'', doc_code:'', is_moved:false, moved_from:'', is_inactive:false, merged_codes:[] 
+                });
+            }
+            rebuildData();
+        }
+
+        function saveProgress() {
+            const a = document.createElement('a');
+            a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(globalData));
+            a.download = "doctors_report_backup.json";
+            document.body.appendChild(a); a.click(); a.remove();
+        }
+
+        function loadProgress(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const r = new FileReader();
+            r.onload = function(e) {
+                try {
+                    globalData = JSON.parse(e.target.result);
+                    globalData.forEach(d => { 
+                        if(d.pageCity && !d.pageGvr) { 
+                            d.pageGvr = d.pageCity; d.pageCity = ""; d.pageGvr_modified = d.pageCity_modified; d.pageCity_modified = false; 
+                        } 
+                    });
+                    renderGrid(); alert("تم تحميل البيانات السابقة بنجاح!");
+                } catch(err) { alert("خطأ في قراءة ملف الحفظ، تأكد من اختيار ملف .json الصحيح."); }
+            }; r.readAsText(file);
+        }
+
+        function exportPDF() {
+            const pages = document.querySelectorAll('.page'), max = pages.length;
+            if (max === 0){ alert("لا توجد بيانات لطباعتها!"); return; }
+            
+            let sel = [], input = document.getElementById('pageRange').value.trim();
+            if (!input || input === 'الكل') {
+                for(let i=1; i<=max; i++) sel.push(i);
+            } else { 
+                input.split(',').forEach(p => { 
+                    p=p.trim(); 
+                    if(p.includes('-')){ 
+                        let [s,e]=p.split('-').map(Number); 
+                        if(s && e && s <= e) for(let i=s; i<=e; i++) sel.push(i); 
+                    } else { 
+                        let n=Number(p); if(n) sel.push(n); 
+                    } 
+                }); 
+            }
+            
+            sel = sel.filter(p => p >= 1 && p <= max);
+            if (!sel.length){ alert("صيغة الصفحات غير صحيحة!"); return; }
+            
+            pages.forEach((p, i) => p.style.display = sel.includes(i+1) ? 'block' : 'none');
+            
+            setTimeout(() => { 
+                window.print(); 
+                pages.forEach(p => p.style.display = 'block'); 
+            }, 300);
+        }
+    </script>
+</body>
+</html>

@@ -188,7 +188,7 @@ function getPrintStyles() {
       .note-moved { color: #d9534f !important; border-color: #d9534f !important; }
       .note-merged { color: #800080 !important; border-color: #800080 !important; }
       .modified { background-color: #ffeb3b !important; }
-      .moved-highlight { background-color: #ffe6e6 !important; }
+      .moved-highlight { background-color: white !important; }
       .updated-stats { background-color: #d4edda !important; }
       .inactive-doc { background-color: transparent !important; }
       .inactive-doc > * { display: none !important; }
@@ -217,11 +217,21 @@ function renderDoctorCardHTML(doc) {
     return '';
   };
 
-  const cleanName = cleanDoctorName(doc.name) || doc.name || '';
-  const cleanSpecialty = cleanGeneralText(doc.specialty);
-  const cleanAddress = cleanGeneralText(doc.address);
-  const cleanMobile = cleanGeneralText(doc.mobile);
-  const cleanHomeTel = cleanGeneralText(doc.home_tel);
+  const isMoved = Boolean(doc.is_moved);
+  const movedClass = isMoved ? 'moved-highlight' : '';
+
+  const cleanName = cleanDoctorName(doc.name, doc.doc_code) || doc.name || '';
+  const cleanSpecialty = cleanGeneralText(doc.specialty || doc.spec || doc.doctor_spec);
+  const cleanAddress = cleanGeneralText(doc.address || doc.clinic_address || doc.addr);
+  const cleanMobile = cleanGeneralText(doc.mobile || doc.phone || doc.mobile_no);
+  const cleanHomeTel = cleanGeneralText(doc.home_tel || doc.tel || doc.landline);
+
+  let mergedCodesStr = '';
+  if (Array.isArray(doc.merged_codes) && doc.merged_codes.length) {
+    mergedCodesStr = doc.merged_codes.join(', ');
+  } else if (typeof doc.merged_codes === 'string' && doc.merged_codes.trim()) {
+    mergedCodesStr = doc.merged_codes.trim();
+  }
 
   return `
     <div class="grid-item ${movedClass}">
@@ -239,8 +249,8 @@ function renderDoctorCardHTML(doc) {
         <div class="doc-name ${getModClass('name')}">${escapeHTML(cleanName)}</div>
         <div class="${getModClass('specialty')}">${escapeHTML(cleanSpecialty)}</div>
         <div class="${getModClass('address')}">${escapeHTML(cleanAddress)}</div>
-        ${doc.is_moved ? `<div class="moved-text note-moved">كان في: ${escapeHTML(cleanGeneralText(doc.moved_from) || 'موقع سابق')}</div>` : ''}
-        ${doc.merged_codes && doc.merged_codes.length ? `<div class="moved-text note-merged">+ مدمج مع: ${escapeHTML(doc.merged_codes.join(', '))}</div>` : ''}
+        ${isMoved ? `<div class="moved-text note-moved">كان في: ${escapeHTML(cleanGeneralText(doc.moved_from) || 'موقع سابق')}</div>` : ''}
+        ${mergedCodesStr ? `<div class="moved-text note-merged">+ مدمج مع: ${escapeHTML(mergedCodesStr)}</div>` : ''}
       </div>
       <div class="bottom-row">
         <div class="${getModClass('mobile')}">${escapeHTML(cleanMobile)}</div>
@@ -422,30 +432,48 @@ export function handleExportPDF(pageRangeStr, totalPages, setSelectedPages = nul
       `);
       iframeDoc.close();
 
-      // Wait a tick for iframe CSS and layout calculation
+      // Allow browser engine to calculate layout and CSS for isolated iframe
+      const printDelay = sel.length > 50 ? 600 : 250;
       setTimeout(() => {
         if (overlay && overlay.parentNode) {
           overlay.parentNode.removeChild(overlay);
         }
 
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (printErr) {
+          console.warn('iframe.contentWindow.print failed, attempting window.print fallback:', printErr);
+          if (typeof setSelectedPages === 'function') {
+            setSelectedPages(sel);
+            setTimeout(() => {
+              window.print();
+              setSelectedPages(null);
+            }, 300);
+          } else {
+            window.print();
+          }
+        }
 
         // Setup afterprint or safety timeout cleanup
-        iframe.contentWindow.addEventListener('afterprint', cleanup);
-        setTimeout(cleanup, 5000);
-      }, 350);
+        try {
+          iframe.contentWindow.addEventListener('afterprint', cleanup);
+        } catch (e) {}
+        setTimeout(cleanup, 10000);
+      }, printDelay);
 
     } catch (err) {
       console.error('Error during isolated iframe print generation:', err);
       cleanup();
       // Fallback to standard window.print if iframe creation is restricted by browser security
-      if (setSelectedPages) {
+      if (typeof setSelectedPages === 'function') {
         setSelectedPages(sel);
         setTimeout(() => {
           window.print();
           setSelectedPages(null);
         }, 300);
+      } else {
+        window.print();
       }
     }
   }, 50);

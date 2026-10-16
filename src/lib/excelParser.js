@@ -1,8 +1,8 @@
 import * as XLSX from 'xlsx';
 
 export const COL_DEFS = {
-  code: ['doctor code', 'doctor co', 'id', 'code', 'كود', 'كود الطبيب', 'كود_الطبيب'],
-  name: ['doctor name', 'name', 'اسم', 'اسم الطبيب', 'الطبيب', 'اسم_الطبيب'],
+  code: ['doctor code', 'doctor co', 'id', 'code', 'كود', 'كود الطبيب', 'كود_الطبيب', 'رقم الطبيب'],
+  name: ['doctor name', 'name', 'اسم', 'اسم الطبيب', 'الطبيب', 'اسم_الطبيب', 'دكتور', 'اسم الدكتور'],
   specialty: [
     'doctor spec', 'specialty', 'speciality', 'spec', 'تخصص', 'التخصص', 'تخصص الطبيب',
     'مجال', 'المجال', 'المهنة', 'doctor_spec', 'doctor spec.'
@@ -27,6 +27,18 @@ export const COL_DEFS = {
   count_new: ['new', 'جديد', 'الجديد', 'الحالات الجديدة', 'حالات جديدة'],
 };
 
+const GOV_CITY_MAP = {
+  'الإسكندرية': ['اسكندرية', 'الإسكندرية', 'سموحة', 'سيدى جابر', 'سيدي جابر', 'محرم بك', 'لوران', 'فيكتوريا', 'الازاريطه', 'الأزارطة', 'العصافرة', 'ميامى', 'ميامي', 'سيدي بشر', 'محطة الرمل', 'العجمي', 'العجمى', 'الابراهيمية', 'الإبراهيمية', 'بولكلي', 'كليوباترا', 'المندرة', 'رشدي', 'جناكليس', 'كامب شيزار', 'سبورتنج', 'المعمورة', 'المعموره'],
+  'البحيرة': ['البحيرة', 'دمنهور', 'كفر الدوار', 'ايتاي البارود', 'إيتاي البارود', 'كوم حمادة', 'ابو حمص', 'أبو حمص', 'حوش عيسى', 'الدلنجات', 'رشيد', 'ابو المطامير', 'أبو المطامير', 'ادكو', 'إدكو', 'شبراخيت', 'الرحمانية', 'المحمودية', 'وادي النطرون'],
+  'الغربية': ['الغربية', 'طنطا', 'المحلة', 'المحله', 'زفتى', 'زفتي', 'كفر الزيات', 'سمنود', 'بسيون', 'قطور', 'السنطة'],
+  'القاهرة': ['القاهرة', 'مدينة نصر', 'مصر الجديدة', 'المعادي', 'المعادى', 'حلوان', 'شبرا', 'عين شمس', 'المرج', 'الزيتون', 'المطرية', 'العباسية', 'التجمع', 'الرحاب', 'الشروق', 'بدر', 'المقطم', 'الزمالك', 'وسط البلد'],
+  'الجيزة': ['الجيزة', 'الدقي', 'الدقى', 'المهندسين', 'الهرم', 'فيصل', 'العجوزة', '6 اكتوبر', 'أكتوبر', 'الشيخ زايد', 'الحوامدية', 'البدرشين', 'الصف', 'أطفيح', 'العياط'],
+  'كفر الشيخ': ['كفر الشيخ', 'دسوق', 'فوه', 'مطوبس', 'سيدي سالم', 'بيلا', 'الحامول', 'بلطيم', 'قلين', 'الرياض'],
+  'المنوفية': ['المنوفية', 'شبين الكوم', 'منوف', 'اشمون', 'أشمون', 'قويسنا', 'بركة السبع', 'تلا', 'الشهداء', 'السادات', 'سرس الليان'],
+  'الدقهلية': ['الدقهلية', 'المنصورة', 'ميت غمر', 'السنبلاوين', 'دكرنس', 'بلقاس', 'شربين', 'المنزلة', 'طلخا', 'نبروه'],
+  'القليوبية': ['القليوبية', 'بنها', 'شبرا الخيمة', 'قليوب', 'الخانكة', 'القناطر الخيرية', 'طوخ', 'شبين القناطر', 'العبور', 'قها', 'كفر شكر']
+};
+
 function normalizeKey(str) {
   if (!str) return '';
   return String(str)
@@ -37,26 +49,61 @@ function normalizeKey(str) {
 
 export function cleanGeneralText(val) {
   if (val === undefined || val === null) return '';
-  return String(val)
+  const s = String(val).trim();
+  if (s === 'NO' || s === 'null' || s === 'undefined') return '';
+  return s
     .replace(/[%*#_~^]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-export function cleanDoctorName(val) {
-  if (val === undefined || val === null) return '';
-  const str = cleanGeneralText(val);
-  const withoutPrefix = str
+export function inferDoctorLocation(rawGvr, rawCity, rawReg, rawAddress, code) {
+  let gvr = cleanGeneralText(rawGvr);
+  let city = cleanGeneralText(rawCity);
+  let reg = cleanGeneralText(rawReg);
+  const addr = cleanGeneralText(rawAddress);
+
+  if (gvr === 'الاسكندرية') gvr = 'الإسكندرية';
+
+  if (!gvr) {
+    const textToScan = `${city} ${reg} ${addr} ${code}`;
+    for (const [govName, cityList] of Object.entries(GOV_CITY_MAP)) {
+      for (const c of cityList) {
+        if (textToScan.includes(c)) {
+          gvr = govName;
+          if (!city) city = c;
+          break;
+        }
+      }
+      if (gvr) break;
+    }
+  }
+
+  return {
+    gvr: gvr || 'غير محدد',
+    city: city || '',
+    region: reg || '',
+  };
+}
+
+export function cleanDoctorName(val, code) {
+  if (val === undefined || val === null) return `طبيب (كود: ${code || ''})`;
+  const raw = String(val).trim();
+  if (!raw) return `طبيب (كود: ${code || ''})`;
+
+  const cleaned = raw.replace(/[%*#_~^]/g, ' ').replace(/\s+/g, ' ').trim();
+  const withoutPrefix = cleaned
     .replace(/^أ\.?\s*د\s*\/?:?\s*/i, '')
     .replace(/^د\s*\/?:?\s*/i, '')
     .trim();
-  if (!withoutPrefix) return '';
+
+  if (!withoutPrefix || /^\d+$/.test(withoutPrefix)) {
+    return `طبيب (كود: ${code || ''})`;
+  }
+
   return 'أ.د/ ' + withoutPrefix;
 }
 
-/**
- * Smart Column Mapping scanning all keys from the top rows
- */
 export function getColumnMapping(dataArray) {
   const map = {};
   if (!Array.isArray(dataArray) || dataArray.length === 0) return map;
@@ -80,7 +127,6 @@ export function getColumnMapping(dataArray) {
     if (!match) {
       match = rowKeys.find((rk) => possibles.some((p) => rk.norm.includes(p) || p.includes(rk.norm)));
     }
-
     if (match) {
       map[field] = match.orig;
     }
@@ -89,17 +135,11 @@ export function getColumnMapping(dataArray) {
   return map;
 }
 
-/**
- * Read file to ArrayBuffer
- */
 async function fileToArrayBuffer(file) {
   if (!file) return null;
   return await file.arrayBuffer();
 }
 
-/**
- * Fallback direct parser if Web Worker is unavailable
- */
 export async function readExcelFile(file) {
   if (!file) return [];
   return new Promise((resolve, reject) => {
@@ -121,9 +161,6 @@ export async function readExcelFile(file) {
   });
 }
 
-/**
- * Run task in Web Worker with fallback
- */
 function runInWorker(type, payload, onProgress = null) {
   return new Promise((resolve, reject) => {
     try {
@@ -161,16 +198,12 @@ function runInWorker(type, payload, onProgress = null) {
   });
 }
 
-/**
- * Main parser merging Docs, Old, and New sheets using Web Worker
- */
 export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgress = null }) {
   if (!docsFile && !oldFile && !newFile) {
     throw new Error('برجاء رفع شيت واحد على الأقل!');
   }
 
   try {
-    // Attempt fast non-blocking worker parsing
     const [docsBuffer, oldBuffer, newBuffer] = await Promise.all([
       fileToArrayBuffer(docsFile),
       fileToArrayBuffer(oldFile),
@@ -181,7 +214,6 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
   } catch (workerError) {
     console.warn('Falling back to synchronous main thread parsing:', workerError);
 
-    // Fallback on main thread
     const [docsData, oldData, newData] = await Promise.all([
       readExcelFile(docsFile),
       readExcelFile(oldFile),
@@ -197,33 +229,47 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
     function processDataset(dataset, mapConf, type) {
       if (!dataset || dataset.length === 0) return;
 
-      dataset.forEach((row) => {
-        let idCode = row[mapConf.code];
-        if (idCode === undefined || idCode === null) return;
-        idCode = String(idCode).trim();
+      dataset.forEach((row, rowIdx) => {
+        let rawCode = row[mapConf.code];
+        if (rawCode === undefined || rawCode === null) return;
+        let idCode = String(rawCode).trim();
         if (idCode === '') return;
 
-        const rawSpec = cleanGeneralText(row[mapConf.specialty] || '');
-        const rawAddr = cleanGeneralText(row[mapConf.address] || '');
-        const rawMob = cleanGeneralText(row[mapConf.mobile] || '');
-        const rawHome = cleanGeneralText(row[mapConf.home_tel] || '');
-        const rawName = cleanDoctorName(row[mapConf.name] || '');
-        const gvr = cleanGeneralText(row[mapConf.gvr] || '');
-        const city = cleanGeneralText(row[mapConf.city] || '');
-        const region = cleanGeneralText(row[mapConf.region] || '');
+        let rawName = row[mapConf.name];
+        let rawAddr = cleanGeneralText(row[mapConf.address] || '');
+        let rawMob = cleanGeneralText(row[mapConf.mobile] || '');
+        let rawHome = cleanGeneralText(row[mapConf.home_tel] || '');
+        let rawSpec = cleanGeneralText(row[mapConf.specialty] || '');
+
+        if (idCode.length > 25 && /^[0-9]+$/.test(String(rawName || '').trim())) {
+          rawAddr = idCode;
+          rawMob = String(rawName).trim();
+          idCode = `MISC_${rowIdx + 1}`;
+          rawName = `طبيب عيادة (${rawAddr.slice(0, 20)}...)`;
+        }
+
+        const loc = inferDoctorLocation(
+          row[mapConf.gvr],
+          row[mapConf.city],
+          row[mapConf.region],
+          rawAddr,
+          idCode
+        );
+
+        const finalName = cleanDoctorName(rawName, idCode);
 
         if (!doctorsMap[idCode]) {
           doctorsMap[idCode] = {
-            doc_code: cleanGeneralText(idCode),
-            name: rawName,
+            doc_code: idCode,
+            name: finalName,
             specialty: rawSpec,
             address: rawAddr,
-            gvr,
-            city,
-            region,
-            pageGvr: gvr,
-            pageCity: city,
-            pageRegion: region,
+            gvr: loc.gvr,
+            city: loc.city,
+            region: loc.region,
+            pageGvr: loc.gvr,
+            pageCity: loc.city,
+            pageRegion: loc.region,
             mobile: rawMob,
             home_tel: rawHome,
             old_stats: '',
@@ -232,24 +278,23 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
             moved_from: '',
             is_inactive: false,
             merged_codes: [],
+            display_order: rowIdx + 1,
           };
         } else {
-          if (!doctorsMap[idCode].name && rawName) doctorsMap[idCode].name = rawName;
+          if ((!doctorsMap[idCode].name || doctorsMap[idCode].name.startsWith('طبيب (كود:')) && finalName) {
+            doctorsMap[idCode].name = finalName;
+          }
           if (!doctorsMap[idCode].specialty && rawSpec) doctorsMap[idCode].specialty = rawSpec;
           if (!doctorsMap[idCode].address && rawAddr) doctorsMap[idCode].address = rawAddr;
           if (!doctorsMap[idCode].mobile && rawMob) doctorsMap[idCode].mobile = rawMob;
           if (!doctorsMap[idCode].home_tel && rawHome) doctorsMap[idCode].home_tel = rawHome;
-          if (!doctorsMap[idCode].pageGvr && gvr) {
-            doctorsMap[idCode].gvr = gvr;
-            doctorsMap[idCode].pageGvr = gvr;
-          }
-          if (!doctorsMap[idCode].pageCity && city) {
-            doctorsMap[idCode].city = city;
-            doctorsMap[idCode].pageCity = city;
-          }
-          if (!doctorsMap[idCode].pageRegion && region) {
-            doctorsMap[idCode].region = region;
-            doctorsMap[idCode].pageRegion = region;
+          if (doctorsMap[idCode].pageGvr === 'غير محدد' && loc.gvr !== 'غير محدد') {
+            doctorsMap[idCode].gvr = loc.gvr;
+            doctorsMap[idCode].pageGvr = loc.gvr;
+            doctorsMap[idCode].city = loc.city;
+            doctorsMap[idCode].pageCity = loc.city;
+            doctorsMap[idCode].region = loc.region;
+            doctorsMap[idCode].pageRegion = loc.region;
           }
         }
 
@@ -264,11 +309,12 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
         if (!countKey && type === 'new') countKey = mapConf.count_general;
 
         const countVal = row[countKey];
-        if (countVal !== undefined && countVal !== null) {
+        if (countVal !== undefined && countVal !== null && countVal !== '') {
+          const parsedCount = parseInt(String(countVal).trim(), 10) || 0;
           if (type === 'docs' || type === 'old') {
-            doctorsMap[idCode].old_stats = countVal;
+            doctorsMap[idCode].old_stats = parsedCount;
           } else {
-            doctorsMap[idCode].new_stats = countVal;
+            doctorsMap[idCode].new_stats = parsedCount;
           }
         }
       });
@@ -282,9 +328,6 @@ export async function parseAndMergeSheets({ docsFile, oldFile, newFile, onProgre
   }
 }
 
-/**
- * Parse sheets for "تحديث الحالات فقط" (Old & New stats only) with Web Worker
- */
 export async function parseStatsOnly({ oldFile, newFile, onProgress = null }) {
   if (!oldFile && !newFile) {
     throw new Error('برجاء رفع شيت القديم أو الجديد على الأقل!');
@@ -315,9 +358,9 @@ export async function parseStatsOnly({ oldFile, newFile, onProgress = null }) {
       if (code) {
         const c = String(code).trim();
         const val = r[oldMapConf.count_old] !== undefined ? r[oldMapConf.count_old] : r[oldMapConf.count_general];
-        if (val !== undefined) {
+        if (val !== undefined && val !== null && val !== '') {
           if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
-          updatesMap[c].old_stats = val;
+          updatesMap[c].old_stats = parseInt(String(val).trim(), 10) || 0;
         }
       }
     });
@@ -327,9 +370,9 @@ export async function parseStatsOnly({ oldFile, newFile, onProgress = null }) {
       if (code) {
         const c = String(code).trim();
         const val = r[newMapConf.count_new] !== undefined ? r[newMapConf.count_new] : r[newMapConf.count_general];
-        if (val !== undefined) {
+        if (val !== undefined && val !== null && val !== '') {
           if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
-          updatesMap[c].new_stats = val;
+          updatesMap[c].new_stats = parseInt(String(val).trim(), 10) || 0;
         }
       }
     });

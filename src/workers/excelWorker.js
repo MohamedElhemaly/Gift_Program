@@ -1,8 +1,8 @@
 import * as XLSX from 'xlsx';
 
 const COL_DEFS = {
-  code: ['doctor code', 'doctor co', 'id', 'code', 'كود', 'كود الطبيب', 'كود_الطبيب'],
-  name: ['doctor name', 'name', 'اسم', 'اسم الطبيب', 'الطبيب', 'اسم_الطبيب'],
+  code: ['doctor code', 'doctor co', 'id', 'code', 'كود', 'كود الطبيب', 'كود_الطبيب', 'رقم الطبيب'],
+  name: ['doctor name', 'name', 'اسم', 'اسم الطبيب', 'الطبيب', 'اسم_الطبيب', 'دكتور', 'اسم الدكتور'],
   specialty: [
     'doctor spec', 'specialty', 'speciality', 'spec', 'تخصص', 'التخصص', 'تخصص الطبيب',
     'مجال', 'المجال', 'المهنة', 'doctor_spec', 'doctor spec.'
@@ -25,6 +25,19 @@ const COL_DEFS = {
   count_general: ['patient count', 'حالات', 'العدد', 'الحالات', 'اجمالي'],
   count_old: ['old', 'قديم', 'القديم', 'الحالات القديمة', 'حالات سابقة'],
   count_new: ['new', 'جديد', 'الجديد', 'الحالات الجديدة', 'حالات جديدة'],
+};
+
+// Known Egyptian governorates and their major cities for smart location recovery
+const GOV_CITY_MAP = {
+  'الإسكندرية': ['اسكندرية', 'الإسكندرية', 'سموحة', 'سيدى جابر', 'سيدي جابر', 'محرم بك', 'لوران', 'فيكتوريا', 'الازاريطه', 'الأزارطة', 'العصافرة', 'ميامى', 'ميامي', 'سيدي بشر', 'محطة الرمل', 'العجمي', 'العجمى', 'الابراهيمية', 'الإبراهيمية', 'بولكلي', 'كليوباترا', 'المندرة', 'رشدي', 'جناكليس', 'كامب شيزار', 'سبورتنج', 'المعمورة', 'المعموره'],
+  'البحيرة': ['البحيرة', 'دمنهور', 'كفر الدوار', 'ايتاي البارود', 'إيتاي البارود', 'كوم حمادة', 'ابو حمص', 'أبو حمص', 'حوش عيسى', 'الدلنجات', 'رشيد', 'ابو المطامير', 'أبو المطامير', 'ادكو', 'إدكو', 'شبراخيت', 'الرحمانية', 'المحمودية', 'وادي النطرون'],
+  'الغربية': ['الغربية', 'طنطا', 'المحلة', 'المحله', 'زفتى', 'زفتي', 'كفر الزيات', 'سمنود', 'بسيون', 'قطور', 'السنطة'],
+  'القاهرة': ['القاهرة', 'مدينة نصر', 'مصر الجديدة', 'المعادي', 'المعادى', 'حلوان', 'شبرا', 'عين شمس', 'المرج', 'الزيتون', 'المطرية', 'العباسية', 'التجمع', 'الرحاب', 'الشروق', 'بدر', 'المقطم', 'الزمالك', 'وسط البلد'],
+  'الجيزة': ['الجيزة', 'الدقي', 'الدقى', 'المهندسين', 'الهرم', 'فيصل', 'العجوزة', '6 اكتوبر', 'أكتوبر', 'الشيخ زايد', 'الحوامدية', 'البدرشين', 'الصف', 'أطفيح', 'العياط'],
+  'كفر الشيخ': ['كفر الشيخ', 'دسوق', 'فوه', 'مطوبس', 'سيدي سالم', 'بيلا', 'الحامول', 'بلطيم', 'قلين', 'الرياض'],
+  'المنوفية': ['المنوفية', 'شبين الكوم', 'منوف', 'اشمون', 'أشمون', 'قويسنا', 'بركة السبع', 'تلا', 'الشهداء', 'السادات', 'سرس الليان'],
+  'الدقهلية': ['الدقهلية', 'المنصورة', 'ميت غمر', 'السنبلاوين', 'دكرنس', 'بلقاس', 'شربين', 'المنزلة', 'طلخا', 'نبروه'],
+  'القليوبية': ['القليوبية', 'بنها', 'شبرا الخيمة', 'قليوب', 'الخانكة', 'القناطر الخيرية', 'طوخ', 'شبين القناطر', 'العبور', 'قها', 'كفر شكر']
 };
 
 function normalizeKey(str) {
@@ -54,13 +67,10 @@ function getColumnMapping(dataArray) {
 
   for (const field in COL_DEFS) {
     const possibles = COL_DEFS[field].map(normalizeKey);
-    // 1. Exact normalized match
     let match = rowKeys.find((rk) => possibles.some((p) => rk.norm === p));
-    // 2. Substring match
     if (!match) {
       match = rowKeys.find((rk) => possibles.some((p) => rk.norm.includes(p) || p.includes(rk.norm)));
     }
-
     if (match) {
       map[field] = match.orig;
     }
@@ -69,29 +79,68 @@ function getColumnMapping(dataArray) {
   return map;
 }
 
-/**
- * Sanitizes dirty Excel strings:
- * Replaces % and noise symbols (*, #, _, ~, ^) with space, and normalizes excess whitespace.
- */
 function sanitizeString(val) {
   if (val === undefined || val === null) return '';
-  return String(val)
+  const s = String(val).trim();
+  if (s === 'NO' || s === 'null' || s === 'undefined') return '';
+  return s
     .replace(/[%*#_~^]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-/**
- * Sanitizes doctor name and ensures proper clean prefix
- */
-function sanitizeDoctorName(val) {
-  if (val === undefined || val === null) return '';
-  const str = sanitizeString(val);
-  const withoutPrefix = str
+function inferDoctorLocation(rawGvr, rawCity, rawReg, rawAddress, code) {
+  let gvr = sanitizeString(rawGvr);
+  let city = sanitizeString(rawCity);
+  let reg = sanitizeString(rawReg);
+  const addr = sanitizeString(rawAddress);
+
+  if (gvr === 'الاسكندرية') gvr = 'الإسكندرية';
+
+  // If governorate is missing, smartly infer from address, city, or region
+  if (!gvr) {
+    const textToScan = `${city} ${reg} ${addr} ${code}`;
+    for (const [govName, cityList] of Object.entries(GOV_CITY_MAP)) {
+      for (const c of cityList) {
+        if (textToScan.includes(c)) {
+          gvr = govName;
+          if (!city) city = c;
+          break;
+        }
+      }
+      if (gvr) break;
+    }
+  }
+
+  return {
+    gvr: gvr || 'غير محدد',
+    city: city || '',
+    region: reg || '',
+  };
+}
+
+function sanitizeDoctorName(val, code, address) {
+  if (val === undefined || val === null) return `طبيب (كود: ${code})`;
+  const raw = String(val).trim();
+  if (!raw) return `طبيب (كود: ${code})`;
+
+  // Check if row was shifted where name is numeric and code is an address
+  if (/^\d{7,15}$/.test(raw) && code && String(code).length > 20) {
+    return `طبيب عيادة (${String(code).slice(0, 22)}...)`;
+  }
+
+  // Remove noise symbols
+  const cleaned = raw.replace(/[%*#_~^]/g, ' ').replace(/\s+/g, ' ').trim();
+  const withoutPrefix = cleaned
     .replace(/^أ\.?\s*د\s*\/?:?\s*/i, '')
     .replace(/^د\s*\/?:?\s*/i, '')
     .trim();
-  if (!withoutPrefix) return '';
+
+  // If name was only symbols (e.g. *** or % or #####)
+  if (!withoutPrefix || /^\d+$/.test(withoutPrefix)) {
+    return `طبيب (كود: ${code})`;
+  }
+
   return 'أ.د/ ' + withoutPrefix;
 }
 
@@ -110,7 +159,7 @@ self.onmessage = async (e) => {
     if (type === 'PARSE_AND_MERGE') {
       const { docsBuffer, oldBuffer, newBuffer } = payload;
 
-      self.postMessage({ id, type: 'PROGRESS', message: 'جاري فك تشفير وتفكيك ملفات الإكسيل...' });
+      self.postMessage({ id, type: 'PROGRESS', message: 'جاري قراءة وتفكيك ملفات الإكسيل...' });
       const docsData = parseBuffer(docsBuffer);
       const oldData = parseBuffer(oldBuffer);
       const newData = parseBuffer(newBuffer);
@@ -119,7 +168,7 @@ self.onmessage = async (e) => {
         throw new Error('لم يتم العثور على أي بيانات داخل الملفات المرفوعة!');
       }
 
-      self.postMessage({ id, type: 'PROGRESS', message: 'جاري مطابقة الأعمدة وتطهير البيانات ودمج الإحصائيات...' });
+      self.postMessage({ id, type: 'PROGRESS', message: 'جاري استخراج وتطهير البيانات وربط المحافظات الذكي...' });
       const docsMapConf = getColumnMapping(docsData);
       const oldMapConf = getColumnMapping(oldData);
       const newMapConf = getColumnMapping(newData);
@@ -129,33 +178,48 @@ self.onmessage = async (e) => {
       function processDataset(dataset, mapConf, sheetType) {
         if (!dataset || dataset.length === 0) return;
 
-        dataset.forEach((row) => {
-          let idCode = row[mapConf.code];
-          if (idCode === undefined || idCode === null) return;
-          idCode = sanitizeString(idCode);
+        dataset.forEach((row, rowIdx) => {
+          let rawCode = row[mapConf.code];
+          if (rawCode === undefined || rawCode === null) return;
+          let idCode = String(rawCode).trim();
           if (idCode === '') return;
 
-          const rawSpec = sanitizeString(row[mapConf.specialty] || '');
-          const rawAddr = sanitizeString(row[mapConf.address] || '');
-          const rawMob = sanitizeString(row[mapConf.mobile] || '');
-          const rawHome = sanitizeString(row[mapConf.home_tel] || '');
-          const rawName = sanitizeDoctorName(row[mapConf.name] || '');
-          const gvr = sanitizeString(row[mapConf.gvr] || '');
-          const city = sanitizeString(row[mapConf.city] || '');
-          const region = sanitizeString(row[mapConf.region] || '');
+          let rawName = row[mapConf.name];
+          let rawAddr = sanitizeString(row[mapConf.address] || '');
+          let rawMob = sanitizeString(row[mapConf.mobile] || '');
+          let rawHome = sanitizeString(row[mapConf.home_tel] || '');
+          let rawSpec = sanitizeString(row[mapConf.specialty] || '');
+
+          // Detect shifted Excel row: code contains address words and name is digits
+          if (idCode.length > 25 && /^[0-9]+$/.test(String(rawName || '').trim())) {
+            rawAddr = idCode;
+            rawMob = String(rawName).trim();
+            idCode = `MISC_${rowIdx + 1}`;
+            rawName = `طبيب عيادة (${rawAddr.slice(0, 20)}...)`;
+          }
+
+          const loc = inferDoctorLocation(
+            row[mapConf.gvr],
+            row[mapConf.city],
+            row[mapConf.region],
+            rawAddr,
+            idCode
+          );
+
+          const finalName = sanitizeDoctorName(rawName, idCode, rawAddr);
 
           if (!doctorsMap[idCode]) {
             doctorsMap[idCode] = {
               doc_code: idCode,
-              name: rawName,
+              name: finalName,
               specialty: rawSpec,
               address: rawAddr,
-              gvr,
-              city,
-              region,
-              pageGvr: gvr,
-              pageCity: city,
-              pageRegion: region,
+              gvr: loc.gvr,
+              city: loc.city,
+              region: loc.region,
+              pageGvr: loc.gvr,
+              pageCity: loc.city,
+              pageRegion: loc.region,
               mobile: rawMob,
               home_tel: rawHome,
               old_stats: '',
@@ -164,25 +228,23 @@ self.onmessage = async (e) => {
               moved_from: '',
               is_inactive: false,
               merged_codes: [],
+              display_order: rowIdx + 1,
             };
           } else {
-            // Merge in non-empty values from subsequent sheets or rows
-            if (!doctorsMap[idCode].name && rawName) doctorsMap[idCode].name = rawName;
+            if ((!doctorsMap[idCode].name || doctorsMap[idCode].name.startsWith('طبيب (كود:')) && finalName) {
+              doctorsMap[idCode].name = finalName;
+            }
             if (!doctorsMap[idCode].specialty && rawSpec) doctorsMap[idCode].specialty = rawSpec;
             if (!doctorsMap[idCode].address && rawAddr) doctorsMap[idCode].address = rawAddr;
             if (!doctorsMap[idCode].mobile && rawMob) doctorsMap[idCode].mobile = rawMob;
             if (!doctorsMap[idCode].home_tel && rawHome) doctorsMap[idCode].home_tel = rawHome;
-            if (!doctorsMap[idCode].pageGvr && gvr) {
-              doctorsMap[idCode].gvr = gvr;
-              doctorsMap[idCode].pageGvr = gvr;
-            }
-            if (!doctorsMap[idCode].pageCity && city) {
-              doctorsMap[idCode].city = city;
-              doctorsMap[idCode].pageCity = city;
-            }
-            if (!doctorsMap[idCode].pageRegion && region) {
-              doctorsMap[idCode].region = region;
-              doctorsMap[idCode].pageRegion = region;
+            if (doctorsMap[idCode].pageGvr === 'غير محدد' && loc.gvr !== 'غير محدد') {
+              doctorsMap[idCode].gvr = loc.gvr;
+              doctorsMap[idCode].pageGvr = loc.gvr;
+              doctorsMap[idCode].city = loc.city;
+              doctorsMap[idCode].pageCity = loc.city;
+              doctorsMap[idCode].region = loc.region;
+              doctorsMap[idCode].pageRegion = loc.region;
             }
           }
 
@@ -197,7 +259,7 @@ self.onmessage = async (e) => {
           if (!countKey && sheetType === 'new') countKey = mapConf.count_general;
 
           const countVal = row[countKey];
-          if (countVal !== undefined && countVal !== null) {
+          if (countVal !== undefined && countVal !== null && countVal !== '') {
             const parsedCount = parseInt(String(countVal).trim(), 10) || 0;
             if (sheetType === 'docs' || sheetType === 'old') {
               doctorsMap[idCode].old_stats = parsedCount;
@@ -216,7 +278,6 @@ self.onmessage = async (e) => {
       self.postMessage({ id, type: 'SUCCESS', result });
     } else if (type === 'PARSE_STATS_ONLY') {
       const { oldBuffer, newBuffer } = payload;
-
       const oldData = parseBuffer(oldBuffer);
       const newData = parseBuffer(newBuffer);
 
@@ -231,9 +292,9 @@ self.onmessage = async (e) => {
       oldData.forEach((r) => {
         const code = r[oldMapConf.code];
         if (code) {
-          const c = sanitizeString(code);
+          const c = String(code).trim();
           const val = r[oldMapConf.count_old] !== undefined ? r[oldMapConf.count_old] : r[oldMapConf.count_general];
-          if (val !== undefined && val !== null) {
+          if (val !== undefined && val !== null && val !== '') {
             if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
             updatesMap[c].old_stats = parseInt(String(val).trim(), 10) || 0;
           }
@@ -243,9 +304,9 @@ self.onmessage = async (e) => {
       newData.forEach((r) => {
         const code = r[newMapConf.code];
         if (code) {
-          const c = sanitizeString(code);
+          const c = String(code).trim();
           const val = r[newMapConf.count_new] !== undefined ? r[newMapConf.count_new] : r[newMapConf.count_general];
-          if (val !== undefined && val !== null) {
+          if (val !== undefined && val !== null && val !== '') {
             if (!updatesMap[c]) updatesMap[c] = { doc_code: c };
             updatesMap[c].new_stats = parseInt(String(val).trim(), 10) || 0;
           }

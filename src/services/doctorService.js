@@ -12,17 +12,22 @@ function safeSaveLocalStorage(key, data) {
   }
 }
 
-export function cleanDoctorName(val) {
-  if (!val) return '';
-  let str = String(val)
-    .replace(/[%*#_~^]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const withoutPrefix = str
+export function cleanDoctorName(val, code = '') {
+  if (!val) return code ? `طبيب (كود: ${code})` : '';
+  const raw = String(val).trim();
+  if (!raw) return code ? `طبيب (كود: ${code})` : '';
+  if (raw.startsWith('طبيب')) return raw;
+
+  const cleaned = raw.replace(/[%*#_~^]/g, ' ').replace(/\s+/g, ' ').trim();
+  const withoutPrefix = cleaned
     .replace(/^أ\.?\s*د\s*\/?:?\s*/i, '')
     .replace(/^د\s*\/?:?\s*/i, '')
     .trim();
-  if (!withoutPrefix) return '';
+
+  if (!withoutPrefix || /^\d+$/.test(withoutPrefix)) {
+    return code ? `طبيب (كود: ${code})` : raw;
+  }
+
   return 'أ.د/ ' + withoutPrefix;
 }
 
@@ -159,25 +164,33 @@ export const doctorService = {
       }
 
       // Transform joined data to flat doctor structure matching the original UI model
-      const transformed = allRecords.map((doc) => ({
-        id: doc.id,
-        doc_code: cleanGeneralText(doc.doc_code),
-        name: cleanDoctorName(doc.name),
-        specialty: cleanGeneralText(doc.specialty),
-        address: cleanGeneralText(doc.address),
-        mobile: cleanGeneralText(doc.mobile),
-        home_tel: cleanGeneralText(doc.home_tel),
-        is_inactive: Boolean(doc.is_inactive),
-        is_moved: Boolean(doc.is_moved),
-        moved_from: cleanGeneralText(doc.moved_from),
-        merged_codes: doc.merged_codes || [],
-        location_id: doc.location?.id || null,
-        pageGvr: cleanGeneralText(doc.location?.governorate),
-        pageCity: cleanGeneralText(doc.location?.city),
-        pageRegion: cleanGeneralText(doc.location?.region),
-        old_stats: doc.statistics?.[0]?.old_stats ?? doc.statistics?.old_stats ?? '',
-        new_stats: doc.statistics?.[0]?.new_stats ?? doc.statistics?.new_stats ?? '',
-      }));
+      const transformed = allRecords.map((doc) => {
+        const rawGvr = cleanGeneralText(doc.location?.governorate) || 'غير محدد';
+        const rawCity = cleanGeneralText(doc.location?.city) || '';
+        const rawReg = cleanGeneralText(doc.location?.region) || '';
+        return {
+          id: doc.id,
+          doc_code: cleanGeneralText(doc.doc_code),
+          name: cleanDoctorName(doc.name, doc.doc_code),
+          specialty: cleanGeneralText(doc.specialty),
+          address: cleanGeneralText(doc.address),
+          mobile: cleanGeneralText(doc.mobile),
+          home_tel: cleanGeneralText(doc.home_tel),
+          is_inactive: Boolean(doc.is_inactive),
+          is_moved: Boolean(doc.is_moved),
+          moved_from: cleanGeneralText(doc.moved_from),
+          merged_codes: doc.merged_codes || [],
+          location_id: doc.location?.id || null,
+          gvr: rawGvr,
+          city: rawCity,
+          region: rawReg,
+          pageGvr: rawGvr,
+          pageCity: rawCity,
+          pageRegion: rawReg,
+          old_stats: doc.statistics?.[0]?.old_stats ?? doc.statistics?.old_stats ?? '',
+          new_stats: doc.statistics?.[0]?.new_stats ?? doc.statistics?.new_stats ?? '',
+        };
+      });
 
       // Cache locally for instant offline/reload access
       safeSaveLocalStorage(LOCAL_STORAGE_KEY, transformed);

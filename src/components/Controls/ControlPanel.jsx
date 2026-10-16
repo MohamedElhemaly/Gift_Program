@@ -1,23 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import BlankPageModal from '../Modals/BlankPageModal';
 import ExcelUploadZone from './ExcelUploadZone';
+import AdvancedFilterBar from './AdvancedFilterBar';
 import {
   FileSpreadsheet,
   RefreshCw,
   PlusCircle,
   Printer,
   UserPlus,
-  Filter,
-  Search,
-  RotateCcw,
-  CheckCircle2,
-  Clock,
   AlertTriangle,
-  Building2,
-  MapPin,
-  Stethoscope,
-  X,
+  Clock,
   Sparkles,
 } from 'lucide-react';
 
@@ -25,44 +18,20 @@ export default function ControlPanel({ onPrint }) {
   const {
     rawDoctors,
     displayedDoctors,
-    rebuildData,
-    addBlankPage,
-    setStatus,
-    statusMessage,
     openAddDoctorModal,
     autoSaveState,
     lastSavedTime,
     filters,
-    setFilter,
-    resetFilters,
-    getUniqueFilterOptions,
     showEmptySlotsOnScreen,
     toggleShowEmptySlots,
     distributionMode,
     setDistributionMode,
     openPrintModal,
+    statusMessage,
   } = useDoctorStore();
 
-  const [pageRange, setPageRange] = useState('الكل');
   const [isBlankPageModalOpen, setIsBlankPageModalOpen] = useState(false);
   const [isExcelOpen, setIsExcelOpen] = useState(false);
-  const [localSearch, setLocalSearch] = useState(filters?.searchTerm || '');
-
-  useEffect(() => {
-    setLocalSearch(filters?.searchTerm || '');
-  }, [filters?.searchTerm]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (localSearch !== (filters?.searchTerm || '')) {
-        setFilter('searchTerm', localSearch);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [localSearch]);
-
-  // Get dynamic unique options for dropdowns
-  const { governorates, cities, regions, specialties } = getUniqueFilterOptions();
 
   const hasActiveFilters = Object.entries(filters || {}).some(
     ([k, v]) => v && v !== 'all'
@@ -78,72 +47,78 @@ export default function ControlPanel({ onPrint }) {
 
   return (
     <div className="controls controls-card no-print space-y-4">
-      {/* 🟢 Real-time Auto-Save & Cloud Status Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-gradient-to-r from-slate-50 to-blue-50/50 border border-slate-200 rounded-xl shadow-xs">
-        <div className="flex items-center gap-2.5">
-          {autoSaveState === 'saving' ? (
-            <div className="flex items-center gap-2 text-amber-700 bg-amber-100/80 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>جاري الحفظ التلقائي في السحابة (Supabase)...</span>
-            </div>
-          ) : autoSaveState === 'error' ? (
-            <div className="flex items-center gap-2 text-red-700 bg-red-100/80 px-3 py-1 rounded-full text-xs font-bold">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>تعذر الاتصال بالسحابة - تم الحفظ محلياً في المتصفح</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-emerald-800 bg-emerald-100/80 px-3 py-1 rounded-full text-xs font-bold shadow-xs">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>الحفظ التلقائي السحابي مفعل: كل تعديل يُحفظ فوراً في قاعدة البيانات</span>
-            </div>
-          )}
+      {/* 🟢 System Command & Status Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3.5 bg-slate-50 border border-slate-200/90 rounded-2xl shadow-2xs">
+        {/* Right side: Cloud sync status & live counts */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Cloud Auto-Save Pill */}
+          <div className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+            {autoSaveState === 'saving' ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                <span className="text-amber-700">جاري الحفظ في السحابة...</span>
+              </>
+            ) : autoSaveState === 'error' ? (
+              <>
+                <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                <span className="text-red-700">حفظ محلي (فشل الاتصال بالسحابة)</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-emerald-800">الحفظ السحابي مفعل فوراً</span>
+              </>
+            )}
+            {lastSavedTime && (
+              <span className="text-[10px] text-slate-400 font-normal border-r border-slate-200 pr-2 mr-1 flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                {lastSavedTime}
+              </span>
+            )}
+          </div>
 
-          {lastSavedTime && (
-            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              آخر حفظ: {lastSavedTime}
-            </span>
+          {/* Total Data Count Badge */}
+          <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs text-slate-700 flex items-center gap-1.5">
+            <span className="text-slate-400">إجمالي الأطباء:</span>
+            <span className="font-bold text-blue-700 font-mono">{totalRawCount}</span>
+          </div>
+
+          {/* Active Filtered Count */}
+          {hasActiveFilters && (
+            <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-blue-600 text-white shadow-xs flex items-center gap-1.5 animate-in fade-in">
+              <Sparkles className="w-3.5 h-3.5 text-blue-200" />
+              <span>المعروض: {currentFilteredCount} طبيب ({currentTotalPages} صفحة A4)</span>
+            </div>
           )}
         </div>
 
-        {/* Quick Stats Summary */}
-        <div className="flex items-center gap-2.5 text-xs flex-wrap">
-          <div className="bg-white px-3 py-1 rounded-lg border border-slate-200 text-gray-700 font-semibold shadow-xs">
-            إجمالي الداتا: <span className="font-bold text-blue-600">{totalRawCount}</span> طبيب
-          </div>
-          {hasActiveFilters && (
-            <div className="bg-blue-600 text-white px-3 py-1 rounded-lg font-bold shadow-xs flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              المعروض بعد الفلترة: {currentFilteredCount} طبيب ({currentTotalPages} صفحة A4)
-            </div>
-          )}
-
-          {/* Distribution Mode Toggle (Continuous Full 21 vs By Region) */}
-          <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
-            <span className="text-[11px] font-bold text-slate-500 px-1 select-none">نمط العرض:</span>
+        {/* Left side: View Mode switcher & Blank slots toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Segmented Display Mode Switcher */}
+          <div className="inline-flex items-center p-1 bg-white rounded-xl border border-slate-200 shadow-2xs">
             <button
               type="button"
               onClick={() => setDistributionMode('continuous')}
-              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 distributionMode === 'continuous'
                   ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
-              title="ملء جميع صفحات الـ 21 خانة بأطباء متتاليين بالكامل بدون أي خانات فارغة"
+              title="توزيع متتالي: ملء صفحات الـ 21 خانة بالكامل بدون أي خانات فارغة"
             >
-              📄 توزيع متتالي كامل (21/صفحة ممتلئة)
+              <span>📄 توزيع متتالي (21/صفحة كاملة)</span>
             </button>
             <button
               type="button"
               onClick={() => setDistributionMode('by_region')}
-              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 distributionMode === 'by_region'
                   ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
-              title="تخصيص صفحة مستقلة لكل منطقة جغرافية"
+              title="توزيع حسب المنطقة: صفحة مستقلة لكل منطقة جغرافية"
             >
-              🗺️ صفحة لكل منطقة
+              <span>🗺️ صفحة لكل منطقة</span>
             </button>
           </div>
 
@@ -151,183 +126,32 @@ export default function ControlPanel({ onPrint }) {
           <button
             type="button"
             onClick={toggleShowEmptySlots}
-            className={`px-3 py-1 rounded-lg font-bold border transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
               showEmptySlotsOnScreen
-                ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
             }`}
             title="التبديل بين إظهار شبكة الـ 21 خانة كاملة (بالخانات الشاغرة للطباعة) أو إخفاء الخانات الفارغة"
           >
-            <span>{showEmptySlotsOnScreen ? '👁️ إخفاء الخانات الشاغرة على الشاشة' : '🖨️ إظهار خانات الـ 21 الفارغة للطباعة'}</span>
+            <span>{showEmptySlotsOnScreen ? '👁️ إخفاء الخانات الشاغرة' : '🖨️ إظهار خانات الـ 21 للطباعة'}</span>
           </button>
         </div>
       </div>
 
-      {/* 🔍 1. نظام الفلترة والبحث المتقدم (Multi-Criteria Filtering) */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
-          <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-            <Filter className="w-4 h-4 text-blue-600" />
-            <span>نظام الفلترة والبحث المتقدم</span>
-            {hasActiveFilters && (
-              <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                فلتر مفعّل
-              </span>
-            )}
-          </h3>
+      {/* 🔍 1. Modern Enterprise Filter & Search Bar */}
+      <AdvancedFilterBar />
 
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-xs text-red-600 hover:text-red-800 font-bold flex items-center gap-1 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>إعادة تعيين الفلاتر (عرض الكل)</span>
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          {/* فلتر المحافظة */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-gray-400" />
-              <span>المحافظة:</span>
-            </label>
-            <select
-              value={filters?.governorate || ''}
-              onChange={(e) => setFilter('governorate', e.target.value)}
-              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">جميع المحافظات ({governorates.length})</option>
-              {governorates.map((gov) => (
-                <option key={gov} value={gov}>
-                  {gov}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* فلتر المدينة / المركز */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-gray-400" />
-              <span>المدينة / المركز:</span>
-            </label>
-            <select
-              value={filters?.city || ''}
-              onChange={(e) => setFilter('city', e.target.value)}
-              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">جميع المدن ({cities.length})</option>
-              {cities.map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* فلتر المنطقة */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-gray-400" />
-              <span>المنطقة:</span>
-            </label>
-            <select
-              value={filters?.region || ''}
-              onChange={(e) => setFilter('region', e.target.value)}
-              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">جميع المناطق ({regions.length})</option>
-              {regions.map((reg) => (
-                <option key={reg} value={reg}>
-                  {reg}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* فلتر التخصص */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
-              <Stethoscope className="w-3 h-3 text-gray-400" />
-              <span>التخصص:</span>
-            </label>
-            <select
-              value={filters?.specialty || ''}
-              onChange={(e) => setFilter('specialty', e.target.value)}
-              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">جميع التخصصات ({specialties.length})</option>
-              {specialties.map((spec) => (
-                <option key={spec} value={spec}>
-                  {spec}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* فلتر الحالة */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
-              <span>الحالة:</span>
-            </label>
-            <select
-              value={filters?.status || 'all'}
-              onChange={(e) => setFilter('status', e.target.value)}
-              className="w-full text-xs font-semibold p-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="all">الكل (نشط وغير نشط)</option>
-              <option value="active">الأطباء النشطين فقط</option>
-              <option value="inactive">الأطباء المتوقفين فقط</option>
-              <option value="moved">الأطباء المنقولين فقط</option>
-            </select>
-          </div>
-
-          {/* بحث بالاسم / الكود / الموبايل */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1">
-              <Search className="w-3 h-3 text-gray-400" />
-              <span>اسم الطبيب / الكود:</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="ابحث بالاسم أو الكود..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className="w-full text-xs p-2 pl-7 border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              />
-              {localSearch && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalSearch('');
-                    setFilter('searchTerm', '');
-                  }}
-                  className="absolute left-2 top-2.5 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 📁 2. قسم استيراد وتحديث شيتات الإكسيل (Drag & Drop, Smart Upsert & Data Sanitization) */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+      {/* 📁 2. Excel Import / Update Zone Toggle */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-xs">
         <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => setIsExcelOpen(!isExcelOpen)}
-            className="flex items-center gap-2 text-sm font-bold text-[#007bff] hover:text-[#0056b3] cursor-pointer"
+            className="flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
             <span>استيراد وتحديث شيتات الإكسيل (Excel Drag & Drop / Smart Upsert)</span>
-            <span className="text-[11px] text-gray-400 font-normal">
+            <span className="text-[11px] text-slate-400 font-normal">
               {isExcelOpen ? '▲ إخفاء أدوات الاستيراد' : '▼ إظهار أدوات السحب والإفلات والمزامنة السحابية'}
             </span>
           </button>
@@ -340,20 +164,20 @@ export default function ControlPanel({ onPrint }) {
         )}
       </div>
 
-      {/* تنبيه الأخطاء إن وجدت فقط (تحديثات السيرفر صامتة تماماً وبدون أي لافتات خضراء) */}
+      {/* Error alert banner (if any) */}
       {statusMessage && statusMessage.isError && (
-        <div className="font-bold p-3 rounded-lg text-xs border bg-[#f8d7da] text-[#721c24] border-[#f5c6cb]">
+        <div className="font-bold p-3 rounded-xl text-xs border bg-rose-50 text-rose-800 border-rose-200">
           {statusMessage.text}
         </div>
       )}
 
-      {/* 🚀 3. أزرار الإجراءات الرئيسية والطباعة */}
+      {/* 🚀 3. Primary Actions Bar (Add Doctor, Add Blank Page, Print Options) */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => openAddDoctorModal()}
-            className="btn btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-blue-600 hover:bg-blue-700 shadow-xs text-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 text-white font-bold rounded-xl cursor-pointer transition-all bg-blue-600 hover:bg-blue-700 shadow-xs hover:shadow text-xs"
           >
             <UserPlus className="w-4 h-4" />
             <span>➕ إضافة طبيب جديد</span>
@@ -362,19 +186,19 @@ export default function ControlPanel({ onPrint }) {
           <button
             type="button"
             onClick={() => setIsBlankPageModalOpen(true)}
-            className="btn btn-info inline-flex items-center gap-1.5 px-4 py-2 text-white font-bold rounded-lg cursor-pointer transition-colors bg-[#17a2b8] hover:bg-[#117a8b] text-xs shadow-xs"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 text-slate-700 font-bold rounded-xl cursor-pointer transition-all bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs shadow-2xs"
           >
-            <PlusCircle className="w-4 h-4" />
+            <PlusCircle className="w-4 h-4 text-slate-500" />
             <span>➕ إضافة صفحة فارغة</span>
           </button>
         </div>
 
-        {/* خيارات الطباعة المتقدمة والمزامنة الفورية */}
+        {/* Print Settings Button */}
         {hasData && (
-          <div className="flex items-center gap-2.5 bg-emerald-50/70 p-1.5 px-3 rounded-xl border border-emerald-200 flex-wrap">
-            <div className="text-[11px] font-bold text-emerald-900 flex items-center gap-1 select-none">
+          <div className="flex items-center gap-2.5 bg-emerald-50/80 p-1.5 px-3 rounded-xl border border-emerald-200 shadow-2xs flex-wrap">
+            <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5 select-none">
               <span>جاهز للطباعة:</span>
-              <span className="font-mono bg-emerald-200/60 text-emerald-950 px-2 py-0.5 rounded-md">
+              <span className="font-mono font-bold bg-emerald-200/70 text-emerald-950 px-2.5 py-0.5 rounded-lg text-xs">
                 {currentTotalPages} صفحة A4
               </span>
             </div>

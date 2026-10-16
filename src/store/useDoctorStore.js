@@ -1,6 +1,19 @@
 import { create } from 'zustand';
 import { doctorService } from '../services/doctorService';
 
+export function normalizeArabicText(str) {
+  if (str === undefined || str === null) return '';
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/[ة]/g, 'ه')
+    .replace(/[ى]/g, 'ي')
+    .replace(/[ؤئ]/g, 'ء')
+    .replace(/[\u064B-\u065F\u0670]/g, '') // remove Arabic diacritics / tashkeel
+    .replace(/\s+/g, ' ');
+}
+
 export const useDoctorStore = create((set, get) => ({
   rawDoctors: [],
   displayedDoctors: [],
@@ -73,33 +86,44 @@ export const useDoctorStore = create((set, get) => ({
     const city = (filters.city || '').trim();
     const reg = (filters.region || '').trim();
     const spec = (filters.specialty || '').trim();
-    const term = (filters.searchTerm || '').trim().toLowerCase();
+    const term = (filters.searchTerm || '').trim();
     const status = filters.status || 'all';
+
+    const normGvr = normalizeArabicText(gvr);
+    const normCity = normalizeArabicText(city);
+    const normReg = normalizeArabicText(reg);
+    const normSpec = normalizeArabicText(spec);
+    const normTerm = normalizeArabicText(term);
 
     return rawDoctors.filter((doc) => {
       if (!doc.name && !doc.doc_code && !doc.specialty && !doc.address && !doc.mobile && !doc.old_stats && !doc.new_stats) {
         return false;
       }
 
-      if (gvr && (doc.pageGvr || doc.gvr || '').trim() !== gvr) return false;
-      if (city && (doc.pageCity || doc.city || '').trim() !== city) return false;
-      if (reg && (doc.pageRegion || doc.region || '').trim() !== reg) return false;
-      if (spec && (doc.specialty || '').trim() !== spec) return false;
+      const docGvr = normalizeArabicText(doc.pageGvr || doc.gvr);
+      const docCity = normalizeArabicText(doc.pageCity || doc.city);
+      const docReg = normalizeArabicText(doc.pageRegion || doc.region);
+      const docSpec = normalizeArabicText(doc.specialty || doc.spec || doc.doctor_spec);
+
+      if (normGvr && docGvr !== normGvr) return false;
+      if (normCity && docCity !== normCity) return false;
+      if (normReg && docReg !== normReg) return false;
+      if (normSpec && docSpec !== normSpec) return false;
 
       if (status === 'active' && doc.is_inactive) return false;
       if (status === 'inactive' && !doc.is_inactive) return false;
       if (status === 'moved' && !doc.is_moved) return false;
 
-      if (term) {
-        const nameMatch = doc.name && doc.name.toLowerCase().includes(term);
-        const codeMatch = doc.doc_code && String(doc.doc_code).toLowerCase().includes(term);
-        const specMatch = doc.specialty && doc.specialty.toLowerCase().includes(term);
-        const addrMatch = doc.address && doc.address.toLowerCase().includes(term);
-        const gvrMatch = (doc.pageGvr || doc.gvr) && (doc.pageGvr || doc.gvr).toLowerCase().includes(term);
-        const cityMatch = (doc.pageCity || doc.city) && (doc.pageCity || doc.city).toLowerCase().includes(term);
-        const regMatch = (doc.pageRegion || doc.region) && (doc.pageRegion || doc.region).toLowerCase().includes(term);
-        const mobMatch = doc.mobile && String(doc.mobile).includes(term);
-        const homeMatch = doc.home_tel && String(doc.home_tel).includes(term);
+      if (normTerm) {
+        const nameMatch = normalizeArabicText(doc.name).includes(normTerm);
+        const codeMatch = String(doc.doc_code || '').toLowerCase().includes(normTerm);
+        const specMatch = docSpec.includes(normTerm);
+        const addrMatch = normalizeArabicText(doc.address || doc.clinic_address).includes(normTerm);
+        const gvrMatch = docGvr.includes(normTerm);
+        const cityMatch = docCity.includes(normTerm);
+        const regMatch = docReg.includes(normTerm);
+        const mobMatch = String(doc.mobile || doc.phone || '').includes(normTerm);
+        const homeMatch = String(doc.home_tel || doc.tel || '').includes(normTerm);
         if (!nameMatch && !codeMatch && !specMatch && !addrMatch && !gvrMatch && !cityMatch && !regMatch && !mobMatch && !homeMatch) {
           return false;
         }
@@ -118,24 +142,30 @@ export const useDoctorStore = create((set, get) => ({
     const regions = new Set();
     const specialties = new Set();
 
+    const curGvrNorm = normalizeArabicText(filters?.governorate);
+    const curCityNorm = normalizeArabicText(filters?.city);
+
     for (let i = 0; i < raw.length; i++) {
       const d = raw[i];
       const g = (d.pageGvr || d.gvr || '').trim();
       const c = (d.pageCity || d.city || '').trim();
       const r = (d.pageRegion || d.region || '').trim();
-      const s = (d.specialty || '').trim();
+      const s = (d.specialty || d.spec || d.doctor_spec || '').trim();
+
+      const gNorm = normalizeArabicText(g);
+      const cNorm = normalizeArabicText(c);
 
       if (g) governorates.add(g);
-      if (c && (!filters?.governorate || g === filters.governorate)) cities.add(c);
-      if (r && (!filters?.city || c === filters.city) && (!filters?.governorate || g === filters.governorate)) regions.add(r);
+      if (c && (!curGvrNorm || gNorm === curGvrNorm)) cities.add(c);
+      if (r && (!curCityNorm || cNorm === curCityNorm) && (!curGvrNorm || gNorm === curGvrNorm)) regions.add(r);
       if (s) specialties.add(s);
     }
 
     return {
-      governorates: Array.from(governorates).sort(),
-      cities: Array.from(cities).sort(),
-      regions: Array.from(regions).sort(),
-      specialties: Array.from(specialties).sort(),
+      governorates: Array.from(governorates).sort((a, b) => a.localeCompare(b, 'ar')),
+      cities: Array.from(cities).sort((a, b) => a.localeCompare(b, 'ar')),
+      regions: Array.from(regions).sort((a, b) => a.localeCompare(b, 'ar')),
+      specialties: Array.from(specialties).sort((a, b) => a.localeCompare(b, 'ar')),
     };
   },
 
@@ -225,31 +255,82 @@ export const useDoctorStore = create((set, get) => ({
 
     const mode = get().distributionMode || 'continuous';
 
+    // Normalize gvr, city, region on all objects
+    list = list.map((d) => {
+      const g = (d.pageGvr || d.gvr || 'غير محدد').trim();
+      const c = (d.pageCity || d.city || '').trim();
+      const r = (d.pageRegion || d.region || '').trim();
+      return {
+        ...d,
+        gvr: g,
+        pageGvr: g,
+        city: c,
+        pageCity: c,
+        region: r,
+        pageRegion: r,
+      };
+    });
+
     // =========================================================================
-    // MODE 1: CONTINUOUS FLOW (التوزيع المتتالي الكامل - كل صفحة 21 طبيب بالكامل بدون خانات فارغة)
+    // MODE 1: CONTINUOUS FLOW (التوزيع المتتالي الكامل - كل صفحة 21 طبيب بالكامل)
     // =========================================================================
     if (mode === 'continuous') {
-      // 1. Sort doctors systematically by Governorate > City > Region > Name
       const realDocs = list.filter((d) => d && (d.name || d.doc_code || d.specialty || d.address));
+      
       realDocs.sort((a, b) => {
-        const gA = (a.pageGvr || a.gvr || '').localeCompare(b.pageGvr || b.gvr || '', 'ar');
-        if (gA !== 0) return gA;
-        const cA = (a.pageCity || a.city || '').localeCompare(b.pageCity || b.city || '', 'ar');
-        if (cA !== 0) return cA;
-        const rA = (a.pageRegion || a.region || '').localeCompare(b.pageRegion || b.region || '', 'ar');
-        if (rA !== 0) return rA;
-        return (a.name || '').localeCompare(b.name || '', 'ar');
+        const isGovA = Boolean(a.pageGvr && a.pageGvr !== 'غير محدد');
+        const isGovB = Boolean(b.pageGvr && b.pageGvr !== 'غير محدد');
+        if (isGovA && !isGovB) return -1;
+        if (!isGovA && isGovB) return 1;
+
+        if (isGovA && isGovB) {
+          const gCmp = (a.pageGvr || '').localeCompare(b.pageGvr || '', 'ar');
+          if (gCmp !== 0) return gCmp;
+
+          const hasCityA = Boolean(a.pageCity);
+          const hasCityB = Boolean(b.pageCity);
+          if (hasCityA && !hasCityB) return -1;
+          if (!hasCityA && hasCityB) return 1;
+          if (hasCityA && hasCityB) {
+            const cCmp = (a.pageCity || '').localeCompare(b.pageCity || '', 'ar');
+            if (cCmp !== 0) return cCmp;
+          }
+
+          const hasRegA = Boolean(a.pageRegion);
+          const hasRegB = Boolean(b.pageRegion);
+          if (hasRegA && !hasRegB) return -1;
+          if (!hasRegA && hasRegB) return 1;
+          if (hasRegA && hasRegB) {
+            const rCmp = (a.pageRegion || '').localeCompare(b.pageRegion || '', 'ar');
+            if (rCmp !== 0) return rCmp;
+          }
+        }
+
+        const isFallbackA = (a.name || '').startsWith('طبيب (كود:');
+        const isFallbackB = (b.name || '').startsWith('طبيب (كود:');
+        if (!isFallbackA && isFallbackB) return -1;
+        if (isFallbackA && !isFallbackB) return 1;
+
+        const nA = (a.name || '').trim();
+        const nB = (b.name || '').trim();
+        if (nA && !nB) return -1;
+        if (!nA && nB) return 1;
+        if (nA && nB) {
+          const nCmp = nA.localeCompare(nB, 'ar');
+          if (nCmp !== 0) return nCmp;
+        }
+
+        return (parseInt(a.doc_code, 10) || 0) - (parseInt(b.doc_code, 10) || 0);
       });
 
-      // 2. Pad only the very final page to a multiple of 21 for print alignment
       const rem = realDocs.length % 21;
-      const needed = (realDocs.length === 0) ? 21 : (rem !== 0 ? 21 - rem : 0);
+      const needed = realDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
 
       const continuousList = [...realDocs];
       const lastDoc = continuousList[continuousList.length - 1] || {};
       for (let i = 0; i < needed; i++) {
         continuousList.push({
-          pageGvr: lastDoc.pageGvr || '',
+          pageGvr: lastDoc.pageGvr || 'غير محدد',
           pageCity: lastDoc.pageCity || '',
           pageRegion: lastDoc.pageRegion || '',
           pageGvr_modified: false,
@@ -272,11 +353,10 @@ export const useDoctorStore = create((set, get) => ({
         });
       }
 
-      // 3. Assign 1..21 counter for each A4 page
       for (let idx = 0; idx < continuousList.length; idx++) {
         const pageItemIndex = (idx % 21) + 1;
         const d = continuousList[idx];
-        d.counter = (d.doc_code || d.name) ? pageItemIndex : '';
+        d.counter = d.doc_code || d.name ? pageItemIndex : '';
       }
 
       if (inputDocs) {
@@ -293,10 +373,10 @@ export const useDoctorStore = create((set, get) => ({
     const groups = {};
     for (let i = 0; i < list.length; i++) {
       const doc = list[i];
-      const gvr = (doc.pageGvr || doc.gvr || '').trim();
+      const gvr = (doc.pageGvr || doc.gvr || 'غير محدد').trim();
       const city = (doc.pageCity || doc.city || '').trim();
       const reg = (doc.pageRegion || doc.region || '').trim();
-      const key = `${gvr || 'بدون محافظة'}::${city || 'بدون مدينة'}::${reg || 'بدون منطقة'}`;
+      const key = `${gvr}::${city || 'بدون مدينة'}::${reg || 'بدون منطقة'}`;
 
       if (!groups[key]) groups[key] = [];
       groups[key].push({
@@ -308,18 +388,23 @@ export const useDoctorStore = create((set, get) => ({
     }
 
     const formattedList = [];
-    const groupKeys = Object.keys(groups).sort();
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const isAUnk = a.startsWith('غير محدد');
+      const isBUnk = b.startsWith('غير محدد');
+      if (isAUnk && !isBUnk) return 1;
+      if (!isAUnk && isBUnk) return -1;
+      return a.localeCompare(b, 'ar');
+    });
 
     for (let k = 0; k < groupKeys.length; k++) {
       const gDocs = groups[groupKeys[k]];
-      const cGvr = gDocs[0].pageGvr || '';
+      const cGvr = gDocs[0].pageGvr || 'غير محدد';
       const cCity = gDocs[0].pageCity || '';
       const cReg = gDocs[0].pageRegion || '';
       const cGvrMod = Boolean(gDocs[0].pageGvr_modified);
       const cCityMod = Boolean(gDocs[0].pageCity_modified);
       const cRegMod = Boolean(gDocs[0].pageRegion_modified);
 
-      // Trim trailing blank doctors
       while (gDocs.length > 0) {
         const last = gDocs[gDocs.length - 1];
         if (!last.name && !last.specialty && !last.address && !last.old_stats && !last.new_stats && !last.doc_code) {
@@ -329,9 +414,8 @@ export const useDoctorStore = create((set, get) => ({
         }
       }
 
-      // Pad up to a multiple of 21
       const rem = gDocs.length % 21;
-      const needed = (gDocs.length === 0) ? 21 : (rem !== 0 ? 21 - rem : 0);
+      const needed = gDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
 
       for (let i = 0; i < needed; i++) {
         gDocs.push({
@@ -358,10 +442,9 @@ export const useDoctorStore = create((set, get) => ({
         });
       }
 
-      // Assign counters (1..N) to real doctors and push into formattedList
       for (let idx = 0; idx < gDocs.length; idx++) {
         const d = gDocs[idx];
-        d.counter = (d.doc_code || d.name) ? idx + 1 : '';
+        d.counter = d.doc_code || d.name ? idx + 1 : '';
         formattedList.push(d);
       }
     }

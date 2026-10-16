@@ -210,7 +210,7 @@ function DoctorCard({ doc, index }) {
               onBlur={(e) => handleBlur('name', e)}
               title="اسم الطبيب (انقر للتعديل)"
             >
-              {cleanDoctorName(doc.name) || doc.name || ''}
+              {cleanDoctorName(doc.name, doc.doc_code) || doc.name || (doc.doc_code ? `طبيب (كود: ${doc.doc_code})` : '')}
             </div>
 
             {/* Specialty & Address */}
@@ -403,7 +403,7 @@ function DoctorCard({ doc, index }) {
         {/* Doctor Information */}
         <div className="doc-info">
           <div className={`doc-name ${getModClass('name')}`}>
-            {cleanDoctorName(doc.name) || doc.name || ''}
+            {cleanDoctorName(doc.name, doc.doc_code) || doc.name || (doc.doc_code ? `طبيب (كود: ${doc.doc_code})` : '')}
           </div>
           <div className={getModClass('specialty')}>
             {specVal}

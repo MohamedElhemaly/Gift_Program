@@ -106,12 +106,15 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
 
   const isInactive = Boolean(doc.is_inactive);
   const isMoved = Boolean(doc.is_moved);
-  const hasData = Boolean(doc.doc_code || doc.name);
+  const isNew = Boolean(doc.isNew || doc.is_new);
+  const isModified = Boolean(doc.isModified || doc.is_modified);
+  const hasData = Boolean(doc.doc_code || doc.name || isNew || isModified);
 
   // Check if doctor has ANY manual modifications (Universal Yellow Highlight)
   const isManuallyModified = Boolean(
+    isNew ||
+    isModified ||
     isMoved ||
-    doc.is_modified ||
     doc.name_modified ||
     doc.specialty_modified ||
     doc.address_modified ||
@@ -138,13 +141,13 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
 
   // Conditionally apply background theme:
   // 1. Inactive: Light Red (Optimistic UI)
-  // 2. Modified (Moved, Inline Edits, Merged): Universal Yellow Highlight (Screen-only)
+  // 2. Newly Created / Modified (Universal Yellow Highlight - Screen-only): bg-yellow-100 / bg-[#ffeb3b]
   // 3. Normal with Data: Clean White
   // 4. Empty slot: Dashed slate
   const cardThemeClass = isInactive
     ? 'bg-rose-100/90 border-rose-300 hover:border-rose-400 shadow-xs ring-1 ring-rose-200'
-    : isManuallyModified
-    ? 'bg-yellow-100/90 border-yellow-400/90 hover:border-yellow-500 shadow-xs ring-2 ring-yellow-300/80'
+    : (isNew || isModified || isManuallyModified)
+    ? 'bg-yellow-100 !bg-[#ffeb3b] text-black border-yellow-500 shadow-sm ring-2 ring-yellow-400/80 hover:border-yellow-600'
     : hasData
     ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md'
     : 'bg-slate-50/50 border-dashed border-slate-300 hover:bg-white hover:border-blue-300';
@@ -206,13 +209,13 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                   </span>
                 </div>
 
-                {/* Universal Modification Indicator Badge */}
-                {isManuallyModified && (
+                {/* Universal Modification Indicator Badge / New Doctor Badge */}
+                {(isNew || isModified || isManuallyModified) && (
                   <span
-                    className="inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded bg-[#ffeb3b] text-black border border-yellow-500 shadow-2xs select-none"
-                    title="تم إجراء تعديل يدوي على بيانات هذا الطبيب"
+                    className="inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded bg-yellow-200 text-yellow-950 border border-yellow-500 shadow-2xs select-none"
+                    title={isNew ? 'طبيب جديد مضاف للتقرير' : 'تم إجراء تعديل يدوي على بيانات هذا الطبيب'}
                   >
-                    <span>✏️ معدل</span>
+                    <span>{isNew ? '✨ طبيب جديد' : '✏️ معدل'}</span>
                   </span>
                 )}
               </div>

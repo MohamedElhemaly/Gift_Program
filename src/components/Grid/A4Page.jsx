@@ -6,7 +6,7 @@ import { MapPin, Building2, Navigation, FileText, UserPlus, Trash2 } from 'lucid
 function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIndex = null }) {
   const { updatePageHeader, addNewDoctorToPage, deletePage, distributionMode } = useDoctorStore();
 
-  const realDocsOnPage = pageDocs.filter((d) => d && (d.name || d.doc_code));
+  const realDocsOnPage = pageDocs.filter((d) => d && (d.name || d.doc_code || d.isNew || d.is_new));
   const docsToInspect = realDocsOnPage.length > 0 ? realDocsOnPage : pageDocs;
 
   // Evaluate Governorate: keep explicit governorate name
@@ -67,7 +67,7 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
 
   if (!isVisible) return null;
 
-  const realCount = pageDocs.filter((d) => d.name || d.doc_code).length;
+  const realCount = realDocsOnPage.length;
 
   return (
     <div

@@ -106,9 +106,13 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
     .filter(Boolean);
   const locationLabel = locationParts.length > 0 ? locationParts.join(' - ') : 'بدون تحديد موقع';
 
+  const isNew = Boolean(doc.isNew || doc.is_new);
+  const isModified = Boolean(doc.isModified || doc.is_modified);
+
   const isManuallyModified = Boolean(
+    isNew ||
+    isModified ||
     doc.is_moved ||
-    doc.is_modified ||
     doc.name_modified ||
     doc.specialty_modified ||
     doc.address_modified ||
@@ -136,8 +140,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   };
 
   const isPlaceholder = Boolean(
-    doc.is_blank_placeholder ||
-    (!doc.id && !doc.doc_code && !doc.name?.trim() && !doc.specialty?.trim() && !doc.address?.trim())
+    !isNew && (
+      doc.is_blank_placeholder ||
+      (!doc.id && !doc.doc_code && !doc.name?.trim() && !doc.specialty?.trim() && !doc.address?.trim())
+    )
   );
 
   // =========================================================================

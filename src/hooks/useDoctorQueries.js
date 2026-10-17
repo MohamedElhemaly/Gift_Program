@@ -338,6 +338,12 @@ export function useAddDoctorMutation() {
       const optimisticDoc = {
         ...doctorData,
         id: tempId,
+        isNew: true,
+        is_new: true,
+        isModified: true,
+        is_modified: true,
+        name_modified: true,
+        doc_code_modified: true,
         is_moved: false,
         is_inactive: false,
         merged_codes: [],

@@ -283,23 +283,23 @@ function generatePrintHTML(selectedPages, displayedDoctors) {
       ? uniqueGvrs.join(' / ')
       : (pageDocs[0]?.pageGvr || '');
 
-    // Evaluate City: if mixed, display 'مدن متعددة'
+    // Evaluate City: if mixed, display 'مناطق متعددة'
     const uniqueCities = Array.from(
       new Set(docsToInspect.map((d) => (d.pageCity || d.city || '').trim()).filter(Boolean))
     );
     const city = uniqueCities.length === 1
       ? uniqueCities[0]
       : uniqueCities.length > 1
-      ? 'مدن متعددة'
+      ? 'مناطق متعددة'
       : (pageDocs[0]?.pageCity || '');
 
     // Evaluate Region: if mixed, display 'مناطق متعددة'
     const uniqueRegions = Array.from(
       new Set(docsToInspect.map((d) => (d.pageRegion || d.region || '').trim()).filter(Boolean))
     );
-    const region = uniqueRegions.length === 1
+    const region = (uniqueRegions.length === 1 && uniqueCities.length <= 1)
       ? uniqueRegions[0]
-      : uniqueRegions.length > 1
+      : (uniqueRegions.length > 1 || uniqueCities.length > 1)
       ? 'مناطق متعددة'
       : (pageDocs[0]?.pageRegion || '');
 

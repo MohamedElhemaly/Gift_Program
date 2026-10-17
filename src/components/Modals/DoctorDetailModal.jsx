@@ -110,6 +110,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   const isModified = Boolean(doc.isModified || doc.is_modified);
 
   const isManuallyModified = Boolean(
+    doc.has_manual_edits ||
     isNew ||
     isModified ||
     doc.is_moved ||

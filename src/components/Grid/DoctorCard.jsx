@@ -108,13 +108,16 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
   const isMoved = Boolean(doc.is_moved);
   const isNew = Boolean(doc.isNew || doc.is_new);
   const isModified = Boolean(doc.isModified || doc.is_modified);
-  const hasData = Boolean(doc.doc_code || doc.name || isNew || isModified);
+  const hasManualEdits = Boolean(doc.has_manual_edits);
+  const hasData = Boolean(doc.doc_code || doc.name || isNew || isModified || hasManualEdits || isMoved);
 
   // Check if doctor has ANY manual modifications (Universal Yellow Highlight)
+  // Driven directly and persistently by the Supabase database flags (has_manual_edits, is_moved)
   const isManuallyModified = Boolean(
+    hasManualEdits ||
+    isMoved ||
     isNew ||
     isModified ||
-    isMoved ||
     doc.name_modified ||
     doc.specialty_modified ||
     doc.address_modified ||
@@ -135,19 +138,18 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
     return '';
   };
 
-  const movedClass = isMoved ? 'moved-highlight' : '';
   const inactiveClass = isInactive ? 'inactive-doc' : '';
   const hideEmptyOnScreen = !hasData && !showEmptySlotsOnScreen;
 
   // Conditionally apply background theme:
   // 1. Inactive: Light Red (Optimistic UI)
-  // 2. Newly Created / Modified (Universal Yellow Highlight - Screen-only): bg-yellow-100 / bg-[#ffeb3b]
+  // 2. Newly Created / Modified / Moved (Universal Yellow Highlight - Screen-only): !bg-[#ffeb3b] / bg-yellow-100
   // 3. Normal with Data: Clean White
   // 4. Empty slot: Dashed slate
   const cardThemeClass = isInactive
     ? 'bg-rose-100/90 border-rose-300 hover:border-rose-400 shadow-xs ring-1 ring-rose-200'
-    : (isNew || isModified || isManuallyModified)
-    ? 'bg-yellow-100 !bg-[#ffeb3b] text-black border-yellow-500 shadow-sm ring-2 ring-yellow-400/80 hover:border-yellow-600'
+    : isManuallyModified
+    ? '!bg-[#ffeb3b] !text-black border-yellow-500 shadow-sm ring-2 ring-yellow-400/80 hover:border-yellow-600'
     : hasData
     ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md'
     : 'bg-slate-50/50 border-dashed border-slate-300 hover:bg-white hover:border-blue-300';
@@ -164,7 +166,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
         ${cardThemeClass}
         ${isHighlighted ? 'jump-highlight ring-4 ring-blue-500 scale-[1.02] shadow-xl z-30' : ''}
         print:!bg-white print:!ring-0 print:!rounded-none print:!shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:p-[6px]
-        ${movedClass} ${inactiveClass}`}
+        ${inactiveClass}`}
       id={`item-${index}`}
       data-doc-code={doc.doc_code || ''}
     >

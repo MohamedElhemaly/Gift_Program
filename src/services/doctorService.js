@@ -108,6 +108,7 @@ export const doctorService = {
             is_moved,
             moved_from,
             merged_codes,
+            has_manual_edits,
             display_order,
             location:locations (
               id,
@@ -138,6 +139,10 @@ export const doctorService = {
               mobile,
               home_tel,
               is_inactive,
+              is_moved,
+              moved_from,
+              merged_codes,
+              has_manual_edits,
               location:locations (
                 id,
                 governorate,
@@ -180,6 +185,7 @@ export const doctorService = {
           is_moved: Boolean(doc.is_moved),
           moved_from: cleanGeneralText(doc.moved_from),
           merged_codes: doc.merged_codes || [],
+          has_manual_edits: Boolean(doc.has_manual_edits),
           location_id: doc.location?.id || null,
           gvr: rawGvr,
           city: rawCity,
@@ -519,6 +525,7 @@ export const doctorService = {
       const target = cached.find((d) => d.id === id || String(d.doc_code) === String(docCode));
       if (target) {
         target[field] = value;
+        target.has_manual_edits = true;
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cached));
       }
       return;
@@ -546,13 +553,25 @@ export const doctorService = {
             last_updated: new Date().toISOString(),
           }, { onConflict: 'doctor_id' });
 
+        // Actively mark doctor as having manual edits
+        try {
+          await supabase
+            .from('doctors')
+            .update({ has_manual_edits: true, updated_at: new Date().toISOString() })
+            .eq('id', resolvedId);
+        } catch (e) {}
+
         await this.logAudit(
           'INLINE_EDIT',
           `تعديل إحصائية (${field}) للطبيب ${docCode} إلى: ${value}`,
           { doctor_id: resolvedId, doc_code: docCode, field, value }
         );
       } else {
-        let query = supabase.from('doctors').update({ [field]: value, updated_at: new Date().toISOString() });
+        let query = supabase.from('doctors').update({
+          [field]: value,
+          has_manual_edits: true,
+          updated_at: new Date().toISOString(),
+        });
         if (resolvedId) {
           query = query.eq('id', resolvedId);
         } else if (docCode) {
@@ -562,7 +581,7 @@ export const doctorService = {
         }
 
         let res = await query;
-        if (res.error && res.error.message && res.error.message.includes('updated_at')) {
+        if (res.error && res.error.message && (res.error.message.includes('has_manual_edits') || res.error.message.includes('column'))) {
           let fallback = supabase.from('doctors').update({ [field]: value });
           if (resolvedId) fallback = fallback.eq('id', resolvedId);
           else fallback = fallback.eq('doc_code', String(docCode).trim());
@@ -598,6 +617,7 @@ export const doctorService = {
         doc.pageCity = c;
         doc.pageRegion = r;
         doc.is_moved = true;
+        doc.has_manual_edits = true;
         doc.moved_from = oldLocStr;
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cached));
       }
@@ -619,6 +639,7 @@ export const doctorService = {
       const updatePayload = {
         location_id: locData.id,
         is_moved: true,
+        has_manual_edits: true,
         moved_from: oldLocStr,
         updated_at: new Date().toISOString(),
       };
@@ -671,6 +692,7 @@ export const doctorService = {
 
       target.old_stats = (parseInt(target.old_stats, 10) || 0) + (parseInt(source.old_stats, 10) || 0);
       target.new_stats = (parseInt(target.new_stats, 10) || 0) + (parseInt(source.new_stats, 10) || 0);
+      target.has_manual_edits = true;
       if (!target.merged_codes) target.merged_codes = [];
       target.merged_codes.push(source.doc_code);
       if (source.merged_codes) target.merged_codes.push(...source.merged_codes);
@@ -679,7 +701,7 @@ export const doctorService = {
       Object.assign(source, {
         name: '', specialty: '', address: '', mobile: '', home_tel: '',
         old_stats: '', new_stats: '', is_inactive: false, is_moved: false,
-        moved_from: '', merged_codes: []
+        moved_from: '', merged_codes: [], has_manual_edits: false,
       });
 
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cached));
@@ -697,6 +719,14 @@ export const doctorService = {
 
     if (error) throw error;
     if (data && !data.success) throw new Error(data.message || 'فشلت عملية الدمج');
+
+    // Ensure has_manual_edits is set to true on target doctor in database
+    try {
+      await supabase
+        .from('doctors')
+        .update({ has_manual_edits: true, updated_at: new Date().toISOString() })
+        .eq('doc_code', String(targetCode).trim());
+    } catch (e) {}
 
     return data;
   },
@@ -762,6 +792,7 @@ export const doctorService = {
       const newDoc = {
         id: crypto.randomUUID(),
         ...doctorData,
+        has_manual_edits: true,
         is_moved: false,
         moved_from: '',
         is_inactive: false,
@@ -789,7 +820,7 @@ export const doctorService = {
         if (!locErr && locData) locationId = locData.id;
       }
 
-      // 2. Insert Doctor
+      // 2. Insert Doctor with has_manual_edits: true
       const docPayload = {
         doc_code: String(doctorData.doc_code).trim(),
         name: doctorData.name || '',
@@ -798,6 +829,7 @@ export const doctorService = {
         mobile: doctorData.mobile || '',
         home_tel: doctorData.home_tel || '',
         location_id: locationId,
+        has_manual_edits: true,
         is_inactive: false,
         is_moved: false,
         moved_from: '',
@@ -834,6 +866,7 @@ export const doctorService = {
         doctor: {
           ...docPayload,
           id: insertedDoc.id,
+          has_manual_edits: true,
           pageGvr: g,
           pageCity: c,
           pageRegion: r,
@@ -843,7 +876,7 @@ export const doctorService = {
       };
     } catch (err) {
       console.warn('addDoctor Supabase error, falling back locally:', err.message);
-      return { success: true, doctor: doctorData, warning: err.message };
+      return { success: true, doctor: { ...doctorData, has_manual_edits: true }, warning: err.message };
     }
   },
 

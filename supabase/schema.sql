@@ -231,6 +231,7 @@ BEGIN
     -- Update target doctor & statistics
     UPDATE public.doctors
     SET merged_codes = v_merged_arr,
+        has_manual_edits = true,
         updated_at = timezone('utc'::text, now())
     WHERE id = v_target.id;
 
@@ -252,6 +253,7 @@ BEGIN
         is_moved = false,
         moved_from = '',
         merged_codes = '{}'::text[],
+        has_manual_edits = false,
         updated_at = timezone('utc'::text, now())
     WHERE id = v_source.id;
 

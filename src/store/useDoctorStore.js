@@ -575,6 +575,7 @@ export const useDoctorStore = create((set, get) => ({
     item[field + '_modified'] = true;
     item[field + '_updated'] = false;
     item.is_modified = true;
+    item.has_manual_edits = true;
     item.is_blank_placeholder = false;
 
     // Keep rawDoctors updated too
@@ -588,6 +589,7 @@ export const useDoctorStore = create((set, get) => ({
           [field + '_modified']: true,
           [field + '_updated']: false,
           is_modified: true,
+          has_manual_edits: true,
         };
       }
       return d;
@@ -600,6 +602,7 @@ export const useDoctorStore = create((set, get) => ({
         [field + '_modified']: true,
         [field + '_updated']: false,
         is_modified: true,
+        has_manual_edits: true,
       });
     }
 
@@ -638,6 +641,7 @@ export const useDoctorStore = create((set, get) => ({
         list[startIndex + i][field] = newVal;
         list[startIndex + i][field + '_modified'] = true;
         list[startIndex + i].is_modified = true;
+        list[startIndex + i].has_manual_edits = true;
         if (list[startIndex + i].doc_code) {
           pageDocCodes.push(String(list[startIndex + i].doc_code).trim());
         }
@@ -652,6 +656,7 @@ export const useDoctorStore = create((set, get) => ({
           [field]: newVal,
           [field + '_modified']: true,
           is_modified: true,
+          has_manual_edits: true,
         };
       }
       return d;
@@ -714,6 +719,7 @@ export const useDoctorStore = create((set, get) => ({
 
     doc.is_moved = true;
     doc.is_modified = true;
+    doc.has_manual_edits = true;
     doc.moved_from = oldLoc;
     doc.pageGvr = gvr;
     doc.pageCity = city;
@@ -729,6 +735,7 @@ export const useDoctorStore = create((set, get) => ({
           ...d,
           is_moved: true,
           is_modified: true,
+          has_manual_edits: true,
           moved_from: oldLoc,
           pageGvr: gvr,
           pageCity: city,
@@ -801,6 +808,7 @@ export const useDoctorStore = create((set, get) => ({
     targetDoc.old_stats_updated = false;
     targetDoc.new_stats_updated = false;
     targetDoc.is_modified = true;
+    targetDoc.has_manual_edits = true;
 
     if (!targetDoc.merged_codes) targetDoc.merged_codes = [];
     if (sourceInRaw.doc_code && !targetDoc.merged_codes.includes(sourceInRaw.doc_code)) {
@@ -821,6 +829,7 @@ export const useDoctorStore = create((set, get) => ({
       targetInRaw.old_stats_modified = true;
       targetInRaw.new_stats_modified = true;
       targetInRaw.is_modified = true;
+      targetInRaw.has_manual_edits = true;
     }
 
     // Clear source doc in displayedDoctors if visible
@@ -840,6 +849,7 @@ export const useDoctorStore = create((set, get) => ({
         is_moved: false,
         moved_from: '',
         merged_codes: [],
+        has_manual_edits: false,
       });
     }
 
@@ -860,6 +870,7 @@ export const useDoctorStore = create((set, get) => ({
         is_moved: false,
         moved_from: '',
         merged_codes: [],
+        has_manual_edits: false,
       });
     }
 
@@ -938,6 +949,7 @@ export const useDoctorStore = create((set, get) => ({
       is_new: true,
       isModified: true,
       is_modified: true,
+      has_manual_edits: true,
       name_modified: true,
       doc_code_modified: true,
       pageGvr_modified: Boolean(targetGvr),
@@ -1001,6 +1013,7 @@ export const useDoctorStore = create((set, get) => ({
         is_new: true,
         isModified: true,
         is_modified: true,
+        has_manual_edits: true,
         name_modified: true,
         doc_code_modified: true,
       };
@@ -1032,6 +1045,7 @@ export const useDoctorStore = create((set, get) => ({
         is_new: true,
         isModified: true,
         is_modified: true,
+        has_manual_edits: true,
         name_modified: true,
         doc_code_modified: true,
       };

@@ -88,6 +88,7 @@ export function useUpdateDoctorFieldMutation() {
             [field + '_modified']: true,
             [field + '_updated']: false,
             is_modified: true,
+            has_manual_edits: true,
           };
         }
         return doc;
@@ -137,6 +138,7 @@ export function useMoveDoctorMutation() {
             pageCity: newCity,
             pageRegion: newRegion,
             is_moved: true,
+            has_manual_edits: true,
             moved_from: oldLocStr,
             pageGvr_modified: true,
             pageCity_modified: true,
@@ -208,6 +210,7 @@ export function useCombineDoctorsMutation() {
             old_stats_modified: true,
             new_stats_modified: true,
             is_modified: true,
+            has_manual_edits: true,
           };
         } else if (curCode === cleanSource) {
           return {
@@ -223,6 +226,7 @@ export function useCombineDoctorsMutation() {
             is_moved: false,
             moved_from: '',
             merged_codes: [],
+            has_manual_edits: false,
           };
         }
         return d;

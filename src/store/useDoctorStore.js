@@ -525,14 +525,34 @@ export const useDoctorStore = create((set, get) => ({
     item[field] = newVal;
     item[field + '_modified'] = true;
     item[field + '_updated'] = false;
+    item.is_modified = true;
+    item.is_blank_placeholder = false;
 
     // Keep rawDoctors updated too
+    let foundInRaw = false;
     const raw = get().rawDoctors.map((d) => {
-      if ((item.id && d.id === item.id) || (item.doc_code && d.doc_code === item.doc_code)) {
-        return { ...d, [field]: newVal };
+      if ((item.id && d.id === item.id) || (item.doc_code && String(d.doc_code).trim() === String(item.doc_code).trim())) {
+        foundInRaw = true;
+        return {
+          ...d,
+          [field]: newVal,
+          [field + '_modified']: true,
+          [field + '_updated']: false,
+          is_modified: true,
+        };
       }
       return d;
     });
+
+    if (!foundInRaw && (item.name || item.doc_code || item.id)) {
+      raw.push({
+        ...item,
+        [field]: newVal,
+        [field + '_modified']: true,
+        [field + '_updated']: false,
+        is_modified: true,
+      });
+    }
 
     set({ displayedDoctors: list, rawDoctors: raw });
     get().setAutoSaveState('saving');
@@ -563,14 +583,32 @@ export const useDoctorStore = create((set, get) => ({
     get().setAutoSaveState('saving');
 
     // Update the 21 items in this specific page
+    const pageDocCodes = [];
     for (let i = 0; i < 21; i++) {
       if (list[startIndex + i]) {
         list[startIndex + i][field] = newVal;
         list[startIndex + i][field + '_modified'] = true;
+        list[startIndex + i].is_modified = true;
+        if (list[startIndex + i].doc_code) {
+          pageDocCodes.push(String(list[startIndex + i].doc_code).trim());
+        }
       }
     }
 
-    set({ displayedDoctors: list });
+    // Keep rawDoctors updated too so rebuildData preserves the modification
+    const raw = get().rawDoctors.map((d) => {
+      if (d.doc_code && pageDocCodes.includes(String(d.doc_code).trim())) {
+        return {
+          ...d,
+          [field]: newVal,
+          [field + '_modified']: true,
+          is_modified: true,
+        };
+      }
+      return d;
+    });
+
+    set({ displayedDoctors: list, rawDoctors: raw });
     get().rebuildData();
     get().setAutoSaveState('saved');
   },
@@ -626,6 +664,7 @@ export const useDoctorStore = create((set, get) => ({
     const oldLoc = locParts.length > 0 ? locParts.join(' - ') : (doc.moved_from || 'موقع سابق');
 
     doc.is_moved = true;
+    doc.is_modified = true;
     doc.moved_from = oldLoc;
     doc.pageGvr = gvr;
     doc.pageCity = city;
@@ -640,6 +679,7 @@ export const useDoctorStore = create((set, get) => ({
         return {
           ...d,
           is_moved: true,
+          is_modified: true,
           moved_from: oldLoc,
           pageGvr: gvr,
           pageCity: city,
@@ -711,6 +751,7 @@ export const useDoctorStore = create((set, get) => ({
     targetDoc.new_stats_modified = true;
     targetDoc.old_stats_updated = false;
     targetDoc.new_stats_updated = false;
+    targetDoc.is_modified = true;
 
     if (!targetDoc.merged_codes) targetDoc.merged_codes = [];
     if (sourceInRaw.doc_code && !targetDoc.merged_codes.includes(sourceInRaw.doc_code)) {
@@ -730,6 +771,7 @@ export const useDoctorStore = create((set, get) => ({
       targetInRaw.merged_codes = [...targetDoc.merged_codes];
       targetInRaw.old_stats_modified = true;
       targetInRaw.new_stats_modified = true;
+      targetInRaw.is_modified = true;
     }
 
     // Clear source doc in displayedDoctors if visible

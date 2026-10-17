@@ -225,7 +225,11 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   return (
     <div className="modal-overlay animate-fadeIn" onClick={onClose}>
       <div
-        className="modal-content w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-7 text-right max-h-[92vh] overflow-y-auto"
+        className={`modal-content w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-7 text-right max-h-[92vh] overflow-y-auto transition-all ${
+          isManuallyModified
+            ? 'border-2 border-yellow-400 ring-4 ring-yellow-200/50 shadow-yellow-100'
+            : 'border border-slate-200'
+        }`}
         dir="rtl"
         onClick={(e) => e.stopPropagation()}
       >

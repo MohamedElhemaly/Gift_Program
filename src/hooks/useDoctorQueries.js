@@ -87,6 +87,7 @@ export function useUpdateDoctorFieldMutation() {
             [field]: value,
             [field + '_modified']: true,
             [field + '_updated']: false,
+            is_modified: true,
           };
         }
         return doc;
@@ -140,6 +141,7 @@ export function useMoveDoctorMutation() {
             pageGvr_modified: true,
             pageCity_modified: true,
             pageRegion_modified: true,
+            is_modified: true,
           };
         }
         return d;
@@ -205,6 +207,7 @@ export function useCombineDoctorsMutation() {
             merged_codes: merged,
             old_stats_modified: true,
             new_stats_modified: true,
+            is_modified: true,
           };
         } else if (curCode === cleanSource) {
           return {

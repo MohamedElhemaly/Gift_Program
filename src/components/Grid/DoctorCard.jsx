@@ -106,8 +106,8 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
   );
 
   const getModClass = (field) => {
-    if (doc[field + '_modified']) return 'modified bg-yellow-200/90 text-yellow-950 font-bold px-1 rounded border border-yellow-400/80 shadow-2xs print:bg-transparent print:border-0 print:text-black print:shadow-none';
-    if (doc[field + '_updated']) return 'updated-stats bg-emerald-100 text-emerald-950 px-1 rounded border border-emerald-300 print:bg-transparent print:border-0 print:text-black';
+    if (doc[field + '_modified']) return 'modified !bg-[#ffeb3b] !text-black font-bold px-1 rounded border !border-yellow-500 shadow-2xs print:!bg-transparent print:!border-0 print:!text-black print:!shadow-none';
+    if (doc[field + '_updated']) return 'updated-stats bg-emerald-100 text-emerald-950 px-1 rounded border border-emerald-300 print:!bg-transparent print:!border-0 print:!text-black';
     return '';
   };
 
@@ -139,7 +139,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
         ${hideEmptyOnScreen ? 'hidden print:flex' : ''}
         ${cardThemeClass}
         ${isHighlighted ? 'jump-highlight ring-4 ring-blue-500 scale-[1.02] shadow-xl z-30' : ''}
-        print:bg-white print:rounded-none print:shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:p-[6px]
+        print:!bg-white print:!ring-0 print:!rounded-none print:!shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:p-[6px]
         ${movedClass} ${inactiveClass}`}
       id={`item-${index}`}
       data-doc-code={doc.doc_code || ''}
@@ -184,6 +184,16 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                     {doc.doc_code || ''}
                   </span>
                 </div>
+
+                {/* Universal Modification Indicator Badge */}
+                {isManuallyModified && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-black px-1.5 py-0.5 rounded bg-[#ffeb3b] text-black border border-yellow-500 shadow-2xs select-none"
+                    title="تم إجراء تعديل يدوي على بيانات هذا الطبيب"
+                  >
+                    <span>✏️ معدل</span>
+                  </span>
+                )}
               </div>
 
               {/* Action Buttons Toolbar */}
@@ -288,13 +298,15 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
               {/* Specialty */}
               <div
                 className={`inline-flex items-center gap-1.5 text-xs max-w-full transition-colors ${
-                  specVal
-                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md w-fit ${isReadOnly ? 'cursor-default' : 'cursor-text hover:border-blue-300'} ${getModClass('specialty')}`
-                    : `text-slate-400 px-1 py-0.5 rounded ${isReadOnly ? 'cursor-default' : 'cursor-text hover:bg-slate-100/60'} w-fit ${getModClass('specialty')}`
+                  doc.specialty_modified
+                    ? `w-fit ${getModClass('specialty')}`
+                    : specVal
+                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md w-fit ${isReadOnly ? 'cursor-default' : 'cursor-text hover:border-blue-300'}`
+                    : `text-slate-400 px-1 py-0.5 rounded ${isReadOnly ? 'cursor-default' : 'cursor-text hover:bg-slate-100/60'} w-fit`
                 }`}
                 title={isReadOnly ? `التخصص: ${specVal || 'غير محدد'}` : `التخصص: ${specVal || 'انقر للتعديل'}`}
               >
-                <Stethoscope className={`w-3.5 h-3.5 flex-shrink-0 select-none ${specVal ? 'text-blue-500' : 'text-slate-400 opacity-60'}`} />
+                <Stethoscope className={`w-3.5 h-3.5 flex-shrink-0 select-none ${doc.specialty_modified ? 'text-black' : specVal ? 'text-blue-500' : 'text-slate-400 opacity-60'}`} />
                 <span
                   contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
@@ -313,7 +325,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                 } ${getModClass('address')}`}
                 title={isReadOnly ? `العنوان: ${addrVal || 'غير محدد'}` : `العنوان ومقر العيادة: ${addrVal || 'انقر للتعديل'}`}
               >
-                <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5 select-none" />
+                <MapPin className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 select-none ${doc.address_modified ? 'text-black' : 'text-slate-400'}`} />
                 <span
                   contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
@@ -350,17 +362,19 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
             <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200/70">
               {/* Old Stats */}
               <div
-                className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-amber-200 transition-colors ${
-                  isReadOnly ? 'cursor-default' : 'hover:border-amber-400 cursor-text'
-                } ${getModClass('old_stats')}`}
+                className={`flex items-center justify-between px-2 py-1 rounded transition-colors ${
+                  doc.old_stats_modified
+                    ? `${getModClass('old_stats')}`
+                    : 'bg-white border border-amber-200'
+                } ${isReadOnly ? 'cursor-default' : 'hover:border-amber-400 cursor-text'}`}
                 title={isReadOnly ? 'الحالات السابقة (للقراءة فقط)' : 'الحالات السابقة (انقر للتعديل)'}
               >
-                <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1 select-none">
-                  <Activity className="w-3 h-3 text-amber-500" />
+                <span className={`text-[11px] font-bold flex items-center gap-1 select-none ${doc.old_stats_modified ? 'text-black' : 'text-amber-700'}`}>
+                  <Activity className={`w-3 h-3 ${doc.old_stats_modified ? 'text-black' : 'text-amber-500'}`} />
                   القديم:
                 </span>
                 <span
-                  className={`font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center ${isReadOnly ? 'cursor-default' : ''}`}
+                  className={`font-mono font-bold text-xs outline-none min-w-[15px] text-center ${doc.old_stats_modified ? 'text-black' : 'text-slate-800'} ${isReadOnly ? 'cursor-default' : ''}`}
                   contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="0"
@@ -372,17 +386,19 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
 
               {/* New Stats */}
               <div
-                className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-emerald-200 transition-colors ${
-                  isReadOnly ? 'cursor-default' : 'hover:border-emerald-400 cursor-text'
-                } ${getModClass('new_stats')}`}
+                className={`flex items-center justify-between px-2 py-1 rounded transition-colors ${
+                  doc.new_stats_modified
+                    ? `${getModClass('new_stats')}`
+                    : 'bg-white border border-emerald-200'
+                } ${isReadOnly ? 'cursor-default' : 'hover:border-emerald-400 cursor-text'}`}
                 title={isReadOnly ? 'الحالات الجديدة (للقراءة فقط)' : 'الحالات الجديدة (انقر للتعديل)'}
               >
-                <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 select-none">
-                  <Sparkles className="w-3 h-3 text-emerald-500" />
+                <span className={`text-[11px] font-bold flex items-center gap-1 select-none ${doc.new_stats_modified ? 'text-black' : 'text-emerald-700'}`}>
+                  <Sparkles className={`w-3 h-3 ${doc.new_stats_modified ? 'text-black' : 'text-emerald-500'}`} />
                   الجديد:
                 </span>
                 <span
-                  className={`font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center ${isReadOnly ? 'cursor-default' : ''}`}
+                  className={`font-mono font-bold text-xs outline-none min-w-[15px] text-center ${doc.new_stats_modified ? 'text-black' : 'text-slate-800'} ${isReadOnly ? 'cursor-default' : ''}`}
                   contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="0"

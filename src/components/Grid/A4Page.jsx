@@ -39,9 +39,15 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
     ? 'مناطق متعددة'
     : (pageDocs[0]?.pageRegion || '');
 
-  const mGvr = pageDocs.some((d) => d.pageGvr_modified) ? 'modified' : '';
-  const mCity = pageDocs.some((d) => d.pageCity_modified) ? 'modified' : '';
-  const mReg = pageDocs.some((d) => d.pageRegion_modified) ? 'modified' : '';
+  const mGvr = pageDocs.some((d) => d.pageGvr_modified)
+    ? 'modified !bg-[#ffeb3b] !text-black border !border-yellow-500 print:!bg-transparent print:!border-0 print:!text-black'
+    : '';
+  const mCity = pageDocs.some((d) => d.pageCity_modified)
+    ? 'modified !bg-[#ffeb3b] !text-black border !border-yellow-500 print:!bg-transparent print:!border-0 print:!text-black'
+    : '';
+  const mReg = pageDocs.some((d) => d.pageRegion_modified)
+    ? 'modified !bg-[#ffeb3b] !text-black border !border-yellow-500 print:!bg-transparent print:!border-0 print:!text-black'
+    : '';
 
   const filters = useDoctorStore((state) => state.filters);
   const isReadOnly = Boolean(

@@ -6,24 +6,42 @@ import { MapPin, Building2, Navigation, FileText, UserPlus, Trash2 } from 'lucid
 function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIndex = null }) {
   const { updatePageHeader, openAddDoctorModal, deletePage, distributionMode } = useDoctorStore();
 
-  const firstDoc = pageDocs[0] || {};
-  const lastRealDoc = [...pageDocs].reverse().find((d) => d.name || d.doc_code) || firstDoc;
+  const realDocsOnPage = pageDocs.filter((d) => d && (d.name || d.doc_code));
+  const docsToInspect = realDocsOnPage.length > 0 ? realDocsOnPage : pageDocs;
 
-  const gvr = firstDoc.pageGvr === lastRealDoc.pageGvr || !lastRealDoc.pageGvr
-    ? (firstDoc.pageGvr || '')
-    : `${firstDoc.pageGvr} / ${lastRealDoc.pageGvr}`;
+  // Evaluate Governorate: keep explicit governorate name
+  const uniqueGvrs = Array.from(
+    new Set(docsToInspect.map((d) => (d.pageGvr || d.gvr || '').trim()).filter(Boolean))
+  );
+  const gvr = uniqueGvrs.length === 1
+    ? uniqueGvrs[0]
+    : uniqueGvrs.length > 1
+    ? uniqueGvrs.join(' / ')
+    : (pageDocs[0]?.pageGvr || '');
 
-  const city = firstDoc.pageCity === lastRealDoc.pageCity || !lastRealDoc.pageCity
-    ? (firstDoc.pageCity || '')
-    : `${firstDoc.pageCity} / ${lastRealDoc.pageCity}`;
+  // Evaluate City: if mixed, display 'مدن متعددة'
+  const uniqueCities = Array.from(
+    new Set(docsToInspect.map((d) => (d.pageCity || d.city || '').trim()).filter(Boolean))
+  );
+  const city = uniqueCities.length === 1
+    ? uniqueCities[0]
+    : uniqueCities.length > 1
+    ? 'مدن متعددة'
+    : (pageDocs[0]?.pageCity || '');
 
-  const region = firstDoc.pageRegion === lastRealDoc.pageRegion || !lastRealDoc.pageRegion
-    ? (firstDoc.pageRegion || '')
-    : `${firstDoc.pageRegion || 'مناطق متعددة'} / ${lastRealDoc.pageRegion || 'مناطق متعددة'}`;
+  // Evaluate Region: if mixed, display 'مناطق متعددة'
+  const uniqueRegions = Array.from(
+    new Set(docsToInspect.map((d) => (d.pageRegion || d.region || '').trim()).filter(Boolean))
+  );
+  const region = uniqueRegions.length === 1
+    ? uniqueRegions[0]
+    : uniqueRegions.length > 1
+    ? 'مناطق متعددة'
+    : (pageDocs[0]?.pageRegion || '');
 
-  const mGvr = firstDoc.pageGvr_modified ? 'modified' : '';
-  const mCity = firstDoc.pageCity_modified ? 'modified' : '';
-  const mReg = firstDoc.pageRegion_modified ? 'modified' : '';
+  const mGvr = pageDocs.some((d) => d.pageGvr_modified) ? 'modified' : '';
+  const mCity = pageDocs.some((d) => d.pageCity_modified) ? 'modified' : '';
+  const mReg = pageDocs.some((d) => d.pageRegion_modified) ? 'modified' : '';
 
   const filters = useDoctorStore((state) => state.filters);
   const isReadOnly = Boolean(

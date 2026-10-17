@@ -29,8 +29,8 @@ export const useDoctorStore = create((set, get) => ({
     lastSavedTime: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
   }),
 
-  // Distribution Mode: 'continuous' (21 doctors/page - full boxes, no blanks) | 'by_region' (per-region A4 pages)
-  distributionMode: 'continuous',
+  // Distribution Mode: 'compact_gov' (Mode B: continuous per governorate, paper-saving) | 'by_region' (Mode A: strict region grouping)
+  distributionMode: 'compact_gov',
   setDistributionMode: (mode) => {
     set({ distributionMode: mode });
     get().rebuildData();
@@ -276,110 +276,223 @@ export const useDoctorStore = create((set, get) => ({
       return;
     }
 
-    // 1. Group strictly by location hierarchy (pageGvr -> pageCity -> pageRegion)
-    const groups = {};
-    for (let i = 0; i < realDocs.length; i++) {
-      const doc = realDocs[i];
-      const gvr = (doc.pageGvr || doc.gvr || 'غير محدد').trim();
-      const city = (doc.pageCity || doc.city || '').trim();
-      const reg = (doc.pageRegion || doc.region || '').trim();
-      const key = `${gvr}::${city || 'بدون مدينة'}::${reg || 'بدون منطقة'}`;
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push({
-        ...doc,
-        pageGvr: gvr,
-        pageCity: city,
-        pageRegion: reg,
-      });
-    }
-
-    // 2. Sort location groups hierarchically (Governorate -> City -> Region)
-    const groupKeys = Object.keys(groups).sort((a, b) => {
-      const [gvrA, cityA, regA] = a.split('::');
-      const [gvrB, cityB, regB] = b.split('::');
-
-      const isAUnk = gvrA === 'غير محدد';
-      const isBUnk = gvrB === 'غير محدد';
-      if (isAUnk && !isBUnk) return 1;
-      if (!isAUnk && isBUnk) return -1;
-
-      const gCmp = gvrA.localeCompare(gvrB, 'ar');
-      if (gCmp !== 0) return gCmp;
-
-      const cCmp = (cityA || '').localeCompare(cityB || '', 'ar');
-      if (cCmp !== 0) return cCmp;
-
-      return (regA || '').localeCompare(regB || '', 'ar');
-    });
-
+    const mode = get().distributionMode || 'by_region';
     const formattedList = [];
 
-    // 3. Process each location group and apply the strict padding rule
-    for (let k = 0; k < groupKeys.length; k++) {
-      const gDocs = groups[groupKeys[k]];
+    // =========================================================================
+    // MODE B: COMPACT GOVERNORATE GROUPING (توزيع متتالي للمحافظة - توفير ورق)
+    // - Group ONLY by Governorate
+    // - Continuous flow across pages of 21 within the same Governorate
+    // - DO NOT insert empty placeholders between cities or regions in the same Governorate
+    // - Only pad to 21 at the very end of the Governorate
+    // =========================================================================
+    if (mode === 'compact_gov' || mode === 'continuous') {
+      const govGroups = {};
+      for (let i = 0; i < realDocs.length; i++) {
+        const doc = realDocs[i];
+        const gvr = (doc.pageGvr || doc.gvr || 'غير محدد').trim();
+        const city = (doc.pageCity || doc.city || '').trim();
+        const reg = (doc.pageRegion || doc.region || '').trim();
 
-      // Sort doctors inside this specific location group
-      gDocs.sort((a, b) => {
-        const isFallbackA = (a.name || '').startsWith('طبيب (كود:');
-        const isFallbackB = (b.name || '').startsWith('طبيب (كود:');
-        if (!isFallbackA && isFallbackB) return -1;
-        if (isFallbackA && !isFallbackB) return 1;
-
-        const nA = (a.name || '').trim();
-        const nB = (b.name || '').trim();
-        if (nA && !nB) return -1;
-        if (!nA && nB) return 1;
-        if (nA && nB) {
-          const nCmp = nA.localeCompare(nB, 'ar');
-          if (nCmp !== 0) return nCmp;
-        }
-
-        return (parseInt(a.doc_code, 10) || 0) - (parseInt(b.doc_code, 10) || 0);
-      });
-
-      const cGvr = gDocs[0].pageGvr || 'غير محدد';
-      const cCity = gDocs[0].pageCity || '';
-      const cReg = gDocs[0].pageRegion || '';
-      const cGvrMod = Boolean(gDocs[0].pageGvr_modified);
-      const cCityMod = Boolean(gDocs[0].pageCity_modified);
-      const cRegMod = Boolean(gDocs[0].pageRegion_modified);
-
-      // 4. The Padding Rule: If the last chunk has fewer than 21 doctors, pad to 21
-      const rem = gDocs.length % 21;
-      const needed = gDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
-
-      for (let i = 0; i < needed; i++) {
-        gDocs.push({
-          pageGvr: cGvr,
-          pageCity: cCity,
-          pageRegion: cReg,
-          pageGvr_modified: cGvrMod,
-          pageCity_modified: cCityMod,
-          pageRegion_modified: cRegMod,
-          name: '',
-          specialty: '',
-          address: '',
-          mobile: '',
-          home_tel: '',
-          old_stats: '',
-          new_stats: '',
-          counter: '',
-          doc_code: '',
-          is_moved: false,
-          moved_from: '',
-          is_inactive: false,
-          merged_codes: [],
-          is_blank_placeholder: true,
+        if (!govGroups[gvr]) govGroups[gvr] = [];
+        govGroups[gvr].push({
+          ...doc,
+          pageGvr: gvr,
+          pageCity: city,
+          pageRegion: reg,
         });
       }
 
-      // 5. Assign page counter (1 to 21) on each page
-      for (let idx = 0; idx < gDocs.length; idx++) {
-        const d = gDocs[idx];
-        const pageItemIndex = (idx % 21) + 1;
-        d.counter = d.doc_code || d.name ? pageItemIndex : '';
-        formattedList.push(d);
+      const govKeys = Object.keys(govGroups).sort((a, b) => {
+        if (a === 'غير محدد' && b !== 'غير محدد') return 1;
+        if (a !== 'غير محدد' && b === 'غير محدد') return -1;
+        return a.localeCompare(b, 'ar');
+      });
+
+      for (let k = 0; k < govKeys.length; k++) {
+        const gvrKey = govKeys[k];
+        const gDocs = govGroups[gvrKey];
+
+        // Sort doctors inside this governorate hierarchically (City -> Region -> Name -> Code)
+        gDocs.sort((a, b) => {
+          const hasCityA = Boolean(a.pageCity);
+          const hasCityB = Boolean(b.pageCity);
+          if (hasCityA && !hasCityB) return -1;
+          if (!hasCityA && hasCityB) return 1;
+          if (hasCityA && hasCityB) {
+            const cCmp = (a.pageCity || '').localeCompare(b.pageCity || '', 'ar');
+            if (cCmp !== 0) return cCmp;
+          }
+
+          const hasRegA = Boolean(a.pageRegion);
+          const hasRegB = Boolean(b.pageRegion);
+          if (hasRegA && !hasRegB) return -1;
+          if (!hasRegA && hasRegB) return 1;
+          if (hasRegA && hasRegB) {
+            const rCmp = (a.pageRegion || '').localeCompare(b.pageRegion || '', 'ar');
+            if (rCmp !== 0) return rCmp;
+          }
+
+          const isFallbackA = (a.name || '').startsWith('طبيب (كود:');
+          const isFallbackB = (b.name || '').startsWith('طبيب (كود:');
+          if (!isFallbackA && isFallbackB) return -1;
+          if (isFallbackA && !isFallbackB) return 1;
+
+          const nA = (a.name || '').trim();
+          const nB = (b.name || '').trim();
+          if (nA && !nB) return -1;
+          if (!nA && nB) return 1;
+          if (nA && nB) {
+            const nCmp = nA.localeCompare(nB, 'ar');
+            if (nCmp !== 0) return nCmp;
+          }
+
+          return (parseInt(a.doc_code, 10) || 0) - (parseInt(b.doc_code, 10) || 0);
+        });
+
+        // Pad with placeholders ONLY at the end of the entire Governorate to complete its final 21-item page
+        const rem = gDocs.length % 21;
+        const needed = gDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
+        const lastDoc = gDocs[gDocs.length - 1] || {};
+        const lastCity = lastDoc.pageCity || '';
+        const lastReg = lastDoc.pageRegion || '';
+
+        for (let i = 0; i < needed; i++) {
+          gDocs.push({
+            pageGvr: gvrKey,
+            pageCity: lastCity,
+            pageRegion: lastReg,
+            pageGvr_modified: false,
+            pageCity_modified: false,
+            pageRegion_modified: false,
+            name: '',
+            specialty: '',
+            address: '',
+            mobile: '',
+            home_tel: '',
+            old_stats: '',
+            new_stats: '',
+            counter: '',
+            doc_code: '',
+            is_moved: false,
+            moved_from: '',
+            is_inactive: false,
+            merged_codes: [],
+            is_blank_placeholder: true,
+          });
+        }
+
+        // Assign page counter (1 to 21) on each page
+        for (let idx = 0; idx < gDocs.length; idx++) {
+          const d = gDocs[idx];
+          const pageItemIndex = (idx % 21) + 1;
+          d.counter = d.doc_code || d.name ? pageItemIndex : '';
+          formattedList.push(d);
+        }
+      }
+    } else {
+      // =========================================================================
+      // MODE A: STRICT REGION GROUPING (صفحة لكل منطقة - النمط السابق)
+      // - Group by full hierarchy: Governorate -> City -> Region
+      // - Pad EVERY specific Region group to 21 with placeholders before starting next Region
+      // =========================================================================
+      const groups = {};
+      for (let i = 0; i < realDocs.length; i++) {
+        const doc = realDocs[i];
+        const gvr = (doc.pageGvr || doc.gvr || 'غير محدد').trim();
+        const city = (doc.pageCity || doc.city || '').trim();
+        const reg = (doc.pageRegion || doc.region || '').trim();
+        const key = `${gvr}::${city || 'بدون مدينة'}::${reg || 'بدون منطقة'}`;
+
+        if (!groups[key]) groups[key] = [];
+        groups[key].push({
+          ...doc,
+          pageGvr: gvr,
+          pageCity: city,
+          pageRegion: reg,
+        });
+      }
+
+      const groupKeys = Object.keys(groups).sort((a, b) => {
+        const [gvrA, cityA, regA] = a.split('::');
+        const [gvrB, cityB, regB] = b.split('::');
+
+        const isAUnk = gvrA === 'غير محدد';
+        const isBUnk = gvrB === 'غير محدد';
+        if (isAUnk && !isBUnk) return 1;
+        if (!isAUnk && isBUnk) return -1;
+
+        const gCmp = gvrA.localeCompare(gvrB, 'ar');
+        if (gCmp !== 0) return gCmp;
+
+        const cCmp = (cityA || '').localeCompare(cityB || '', 'ar');
+        if (cCmp !== 0) return cCmp;
+
+        return (regA || '').localeCompare(regB || '', 'ar');
+      });
+
+      for (let k = 0; k < groupKeys.length; k++) {
+        const gDocs = groups[groupKeys[k]];
+
+        gDocs.sort((a, b) => {
+          const isFallbackA = (a.name || '').startsWith('طبيب (كود:');
+          const isFallbackB = (b.name || '').startsWith('طبيب (كود:');
+          if (!isFallbackA && isFallbackB) return -1;
+          if (isFallbackA && !isFallbackB) return 1;
+
+          const nA = (a.name || '').trim();
+          const nB = (b.name || '').trim();
+          if (nA && !nB) return -1;
+          if (!nA && nB) return 1;
+          if (nA && nB) {
+            const nCmp = nA.localeCompare(nB, 'ar');
+            if (nCmp !== 0) return nCmp;
+          }
+
+          return (parseInt(a.doc_code, 10) || 0) - (parseInt(b.doc_code, 10) || 0);
+        });
+
+        const cGvr = gDocs[0].pageGvr || 'غير محدد';
+        const cCity = gDocs[0].pageCity || '';
+        const cReg = gDocs[0].pageRegion || '';
+        const cGvrMod = Boolean(gDocs[0].pageGvr_modified);
+        const cCityMod = Boolean(gDocs[0].pageCity_modified);
+        const cRegMod = Boolean(gDocs[0].pageRegion_modified);
+
+        const rem = gDocs.length % 21;
+        const needed = gDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
+
+        for (let i = 0; i < needed; i++) {
+          gDocs.push({
+            pageGvr: cGvr,
+            pageCity: cCity,
+            pageRegion: cReg,
+            pageGvr_modified: cGvrMod,
+            pageCity_modified: cCityMod,
+            pageRegion_modified: cRegMod,
+            name: '',
+            specialty: '',
+            address: '',
+            mobile: '',
+            home_tel: '',
+            old_stats: '',
+            new_stats: '',
+            counter: '',
+            doc_code: '',
+            is_moved: false,
+            moved_from: '',
+            is_inactive: false,
+            merged_codes: [],
+            is_blank_placeholder: true,
+          });
+        }
+
+        for (let idx = 0; idx < gDocs.length; idx++) {
+          const d = gDocs[idx];
+          const pageItemIndex = (idx % 21) + 1;
+          d.counter = d.doc_code || d.name ? pageItemIndex : '';
+          formattedList.push(d);
+        }
       }
     }
 

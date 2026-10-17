@@ -92,11 +92,43 @@ export default function ControlPanel({ onPrint }) {
           )}
         </div>
 
-        {/* Left side: Location badge & Blank slots toggle */}
+        {/* Left side: Pagination Grouping Toggle & Blank slots toggle */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Strict Location-Based Pagination Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-xl border border-blue-200 text-blue-900 text-xs font-bold shadow-2xs select-none">
-            <span>🗺️ توزيع معتمد حسب المنطقة (صفحة مستقلة لكل موقع)</span>
+          {/* Pagination Grouping Toggle: Mode A vs Mode B */}
+          <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setDistributionMode('by_region')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                distributionMode === 'by_region'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+              title="صفحة لكل منطقة: فصل كل منطقة في صفحات مستقلة وإكمالها إلى 21 خانة فارغة"
+            >
+              <span>🗺️ صفحة لكل منطقة</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDistributionMode('compact_gov')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                distributionMode === 'compact_gov' || distributionMode === 'continuous'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+              title="توزيع متتالي للمحافظة: دمج مناطق المحافظة الواحدة لمنع هدر الورق مع ترويسة ديناميكية"
+            >
+              <span>📄 توزيع متتالي للمحافظة</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                  distributionMode === 'compact_gov' || distributionMode === 'continuous'
+                    ? 'bg-emerald-700 text-emerald-100'
+                    : 'bg-emerald-100 text-emerald-700'
+                }`}
+              >
+                توفير ورق
+              </span>
+            </button>
           </div>
 
           {/* Toggle Empty Slots on Screen */}

@@ -178,6 +178,12 @@ export const useDoctorStore = create((set, get) => ({
   addDoctorInitialData: null,
   isPrintModalOpen: false,
 
+  // Auto-navigation & Auto-focus for newly added doctors
+  targetPageJump: null,
+  setTargetPageJump: (page) => set({ targetPageJump: page }),
+  newlyAddedDoctorId: null,
+  setNewlyAddedDoctorId: (id) => set({ newlyAddedDoctorId: id }),
+
   openPrintModal: () => set({ isPrintModalOpen: true }),
   closePrintModal: () => set({ isPrintModalOpen: false }),
 
@@ -266,9 +272,9 @@ export const useDoctorStore = create((set, get) => ({
       return;
     }
 
-    // Keep only real doctor objects (ignore pure empty padding from previous state)
+    // Keep only real doctor objects (ignore pure empty padding, but keep newly added draft doctors)
     const realDocs = list.filter(
-      (d) => d && (d.name || d.doc_code || d.specialty || d.address || d.id)
+      (d) => d && !d.is_blank_placeholder && (d.name || d.doc_code || d.specialty || d.address || d.id || d.is_new)
     );
 
     if (realDocs.length === 0) {
@@ -852,6 +858,92 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
+   * Add New Draft Doctor to a specific Page/Location
+   * Dynamically re-chunks (never exceeds 21), auto-navigates, and applies universal yellow highlight.
+   */
+  addNewDoctorToPage: async (pageLocation = {}) => {
+    // 1. Capture exact location header from the page
+    const targetGvr = (pageLocation.pageGvr || pageLocation.gvr || 'غير محدد').trim();
+    const targetCity = (pageLocation.pageCity || pageLocation.city || '').trim();
+    const targetRegion = (pageLocation.pageRegion || pageLocation.region || '').trim();
+
+    // 2. Compute next sequential numeric code
+    let maxCode = 1000;
+    const allKnownDocs = [...(get().rawDoctors || []), ...(get().displayedDoctors || [])];
+    allKnownDocs.forEach((d) => {
+      const num = parseInt(d.doc_code, 10);
+      if (!isNaN(num) && num > maxCode) maxCode = num;
+    });
+    const nextCode = String(maxCode + 1);
+
+    // 3. Create new draft doctor object with Universal Yellow Highlight flags
+    const newId = 'new-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+    const newDoc = {
+      id: newId,
+      doc_code: nextCode,
+      name: '',
+      specialty: '',
+      address: '',
+      mobile: '',
+      home_tel: '',
+      old_stats: '0',
+      new_stats: '0',
+      pageGvr: targetGvr,
+      pageCity: targetCity,
+      pageRegion: targetRegion,
+      is_new: true,
+      is_modified: true,
+      isModified: true,
+      name_modified: true,
+      doc_code_modified: true,
+      pageGvr_modified: Boolean(targetGvr),
+      pageCity_modified: Boolean(targetCity),
+      pageRegion_modified: Boolean(targetRegion),
+      is_blank_placeholder: false,
+      is_inactive: false,
+      is_moved: false,
+      merged_codes: [],
+    };
+
+    // 4. Insert into global raw dataset
+    const updatedRaw = [...(get().rawDoctors || []), newDoc];
+    set({ rawDoctors: updatedRaw });
+
+    // 5. Re-run global chunking algorithm
+    get().rebuildData(updatedRaw);
+
+    // 6. Find where the new doctor landed in displayedDoctors
+    const newIndex = get().displayedDoctors.findIndex(
+      (d) => d && (d.id === newId || d.doc_code === nextCode)
+    );
+
+    const targetPage = newIndex !== -1 ? Math.floor(newIndex / 21) + 1 : 1;
+
+    // 7. Auto-navigate and request auto-focus
+    set({
+      targetPageJump: targetPage,
+      newlyAddedDoctorId: newId,
+    });
+
+    get().setAutoSaveState('saving');
+    get().setStatus(`تمت إضافة خانة طبيب جديدة (كود: ${nextCode}) في صفحة ${targetPage}`);
+
+    // 8. Background optimistic auto-save to database
+    try {
+      const res = await doctorService.addDoctor(newDoc);
+      if (res?.doctor?.id) {
+        newDoc.id = res.doctor.id;
+      }
+      get().setAutoSaveState('saved');
+    } catch (err) {
+      console.warn('Background save of draft doctor:', err);
+      get().setAutoSaveState('saved');
+    }
+
+    return { success: true, newDoc, pageNum: targetPage };
+  },
+
+  /**
    * Add a new Doctor (Create) with Auto-Save
    */
   addDoctor: async (doctorData) => {
@@ -859,13 +951,31 @@ export const useDoctorStore = create((set, get) => ({
     get().setAutoSaveState('saving');
     try {
       const res = await doctorService.addDoctor(doctorData);
-      const newDoc = res.doctor || doctorData;
+      const newDoc = {
+        ...(res.doctor || doctorData),
+        is_new: true,
+        is_modified: true,
+        isModified: true,
+        name_modified: true,
+        doc_code_modified: true,
+      };
 
       const raw = [...get().rawDoctors, newDoc];
+      set({ rawDoctors: raw });
       get().rebuildData(raw);
-      get().setAutoSaveState('saved');
 
-      get().setStatus(`تمت إضافة الطبيب "${newDoc.name || newDoc.doc_code}" بنجاح!`);
+      // Auto-navigate to page
+      const newIndex = get().displayedDoctors.findIndex(
+        (d) => d && (d.id === newDoc.id || d.doc_code === newDoc.doc_code)
+      );
+      const targetPage = newIndex !== -1 ? Math.floor(newIndex / 21) + 1 : 1;
+      set({
+        targetPageJump: targetPage,
+        newlyAddedDoctorId: newDoc.id,
+      });
+
+      get().setAutoSaveState('saved');
+      get().setStatus(`تمت إضافة الطبيب "${newDoc.name || newDoc.doc_code}" بنجاح في صفحة ${targetPage}!`);
       set({ loading: false, isAddDoctorModalOpen: false, addDoctorInitialData: null });
       return { success: true };
     } catch (err) {

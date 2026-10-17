@@ -4,7 +4,7 @@ import { useDoctorStore } from '../../store/useDoctorStore';
 import { MapPin, Building2, Navigation, FileText, UserPlus, Trash2 } from 'lucide-react';
 
 function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIndex = null }) {
-  const { updatePageHeader, openAddDoctorModal, deletePage, distributionMode } = useDoctorStore();
+  const { updatePageHeader, addNewDoctorToPage, deletePage, distributionMode } = useDoctorStore();
 
   const realDocsOnPage = pageDocs.filter((d) => d && (d.name || d.doc_code));
   const docsToInspect = realDocsOnPage.length > 0 ? realDocsOnPage : pageDocs;
@@ -92,11 +92,16 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
           <div className="no-print flex items-center gap-2">
             <button
               type="button"
-              onClick={() => openAddDoctorModal({ pageGvr: gvr, pageCity: city, pageRegion: region })}
-              className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-              title="إضافة طبيب جديد لهذه الصفحة"
+              onClick={() => {
+                const actualGvr = gvr !== 'مناطق متعددة' ? gvr : (pageDocs[0]?.pageGvr || '');
+                const actualCity = city !== 'مناطق متعددة' ? city : (pageDocs[pageDocs.length - 1]?.pageCity || pageDocs[0]?.pageCity || '');
+                const actualRegion = region !== 'مناطق متعددة' ? region : (pageDocs[pageDocs.length - 1]?.pageRegion || pageDocs[0]?.pageRegion || '');
+                addNewDoctorToPage({ pageGvr: actualGvr, pageCity: actualCity, pageRegion: actualRegion });
+              }}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+              title="إضافة طبيب جديد لهذه الصفحة (تقسيم تلقائي ومنع تجاوز 21)"
             >
-              <UserPlus className="w-3 h-3" />
+              <UserPlus className="w-3.5 h-3.5" />
               <span>إضافة طبيب للصفحة</span>
             </button>
 

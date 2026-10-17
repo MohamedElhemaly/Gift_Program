@@ -29,6 +29,8 @@ export default function ReportView({ selectedPages = null }) {
     setFilter,
     resetFilters,
     openPrintModal,
+    targetPageJump,
+    setTargetPageJump,
   } = useDoctorStore();
 
   const isReadOnly = Boolean(
@@ -46,6 +48,23 @@ export default function ReportView({ selectedPages = null }) {
   const [jumpInput, setJumpInput] = useState('');
   const [jumpDocCodeInput, setJumpDocCodeInput] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(null);
+
+  // Auto-Navigate when a new doctor is added to a newly created page
+  useEffect(() => {
+    if (targetPageJump) {
+      if (pagesPerPage !== 'ALL') {
+        const targetBatch = Math.floor((targetPageJump - 1) / pagesPerPage) + 1;
+        setCurrentPage(targetBatch);
+      }
+      setTimeout(() => {
+        const el = document.getElementById(`page-${targetPageJump}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        setTargetPageJump(null);
+      }, 150);
+    }
+  }, [targetPageJump, pagesPerPage, setTargetPageJump]);
 
   const totalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 

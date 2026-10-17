@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import {
   useUpdateDoctorFieldMutation,
@@ -30,9 +30,30 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
     toggleInactive,
     openMaximizeModal,
     openAddDoctorModal,
+    addNewDoctorToPage,
+    newlyAddedDoctorId,
+    setNewlyAddedDoctorId,
     showEmptySlotsOnScreen,
     filters,
   } = useDoctorStore();
+
+  const nameFieldRef = useRef(null);
+
+  // Auto-focus on newly added doctor card
+  useEffect(() => {
+    if (
+      newlyAddedDoctorId &&
+      (doc.id === newlyAddedDoctorId || String(doc.doc_code).trim() === String(newlyAddedDoctorId).trim())
+    ) {
+      const timer = setTimeout(() => {
+        if (nameFieldRef.current) {
+          nameFieldRef.current.focus();
+          nameFieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [newlyAddedDoctorId, doc.id, doc.doc_code]);
 
   const isReadOnly = Boolean(
     (filters?.governorate && filters.governorate.trim()) ||
@@ -278,6 +299,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
 
             {/* Doctor Name */}
             <div
+              ref={nameFieldRef}
               className={`font-bold text-base text-slate-900 leading-snug px-1.5 py-1 rounded transition-colors border border-transparent ${
                 isReadOnly ? 'cursor-default select-text' : 'hover:bg-blue-50/50 cursor-text hover:border-blue-200'
               } ${getModClass('name')}`}
@@ -290,7 +312,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
               onBlur={(e) => handleBlur('name', e)}
               title={isReadOnly ? 'اسم الطبيب (وضع القراءة فقط)' : 'اسم الطبيب (انقر للتعديل)'}
             >
-              {cleanDoctorName(doc.name, doc.doc_code) || doc.name || (doc.doc_code ? `طبيب (كود: ${doc.doc_code})` : '')}
+              {cleanDoctorName(doc.name, doc.doc_code) || doc.name || (doc.is_new ? '' : doc.doc_code ? `طبيب (كود: ${doc.doc_code})` : '')}
             </div>
 
             {/* Specialty & Address */}
@@ -467,7 +489,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  openAddDoctorModal({ pageGvr: doc.pageGvr, pageCity: doc.pageCity, pageRegion: doc.pageRegion });
+                  addNewDoctorToPage({ pageGvr: doc.pageGvr, pageCity: doc.pageCity, pageRegion: doc.pageRegion });
                 }}
                 className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-dashed border-blue-300 text-blue-600 bg-blue-50/60 hover:bg-blue-100 hover:border-blue-400 font-bold text-xs transition-all cursor-pointer shadow-2xs"
                 title="إضافة طبيب في هذه الخانة"

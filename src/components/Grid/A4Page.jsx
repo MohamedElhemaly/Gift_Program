@@ -25,7 +25,18 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
   const mCity = firstDoc.pageCity_modified ? 'modified' : '';
   const mReg = firstDoc.pageRegion_modified ? 'modified' : '';
 
+  const filters = useDoctorStore((state) => state.filters);
+  const isReadOnly = Boolean(
+    (filters?.governorate && filters.governorate.trim()) ||
+    (filters?.city && filters.city.trim()) ||
+    (filters?.region && filters.region.trim()) ||
+    (filters?.specialty && filters.specialty.trim()) ||
+    (filters?.searchTerm && filters.searchTerm.trim()) ||
+    (filters?.status && filters.status !== 'all')
+  );
+
   const handleHeaderBlur = (field, e) => {
+    if (isReadOnly) return;
     const val = e.currentTarget.innerText.trim();
     updatePageHeader(startIndex, field, val);
   };
@@ -52,28 +63,30 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
           </span>
         </div>
 
-        {/* Page Actions Toolbar (Hidden on Print) */}
-        <div className="no-print flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => openAddDoctorModal({ pageGvr: gvr, pageCity: city, pageRegion: region })}
-            className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-            title="إضافة طبيب جديد لهذه الصفحة"
-          >
-            <UserPlus className="w-3 h-3" />
-            <span>إضافة طبيب للصفحة</span>
-          </button>
+        {/* Page Actions Toolbar (Hidden on Print & Hidden in Read-Only Mode) */}
+        {!isReadOnly && (
+          <div className="no-print flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openAddDoctorModal({ pageGvr: gvr, pageCity: city, pageRegion: region })}
+              className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              title="إضافة طبيب جديد لهذه الصفحة"
+            >
+              <UserPlus className="w-3 h-3" />
+              <span>إضافة طبيب للصفحة</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => deletePage(startIndex)}
-            className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-            title="حذف هذه الصفحة بالكامل"
-          >
-            <Trash2 className="w-3 h-3" />
-            <span>حذف الصفحة</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => deletePage(startIndex)}
+              className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              title="حذف هذه الصفحة بالكامل"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>حذف الصفحة</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 1. On-Screen Modern Executive Header Bar */}
@@ -85,12 +98,14 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
           </div>
           <span className="text-xs font-bold text-slate-500 flex-shrink-0">المحافظة:</span>
           <div
-            className={`flex-1 font-bold text-sm text-slate-800 outline-none px-1.5 py-0.5 rounded cursor-text hover:bg-slate-50 ${mGvr}`}
-            contentEditable={true}
+            className={`flex-1 font-bold text-sm text-slate-800 outline-none px-1.5 py-0.5 rounded ${
+              isReadOnly ? 'cursor-default select-text' : 'cursor-text hover:bg-slate-50'
+            } ${mGvr}`}
+            contentEditable={!isReadOnly}
             suppressContentEditableWarning={true}
             data-placeholder="اكتب اسم المحافظة..."
             onBlur={(e) => handleHeaderBlur('pageGvr', e)}
-            title="المحافظة (انقر للتعديل وسيتم الفرز تلقائياً)"
+            title={isReadOnly ? 'المحافظة (وضع القراءة فقط)' : 'المحافظة (انقر للتعديل وسيتم الفرز تلقائياً)'}
           >
             {gvr}
           </div>
@@ -103,12 +118,14 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
           </div>
           <span className="text-xs font-bold text-slate-500 flex-shrink-0">المدينة / المركز:</span>
           <div
-            className={`flex-1 font-bold text-sm text-slate-800 outline-none px-1.5 py-0.5 rounded cursor-text hover:bg-slate-50 ${mCity}`}
-            contentEditable={true}
+            className={`flex-1 font-bold text-sm text-slate-800 outline-none px-1.5 py-0.5 rounded ${
+              isReadOnly ? 'cursor-default select-text' : 'cursor-text hover:bg-slate-50'
+            } ${mCity}`}
+            contentEditable={!isReadOnly}
             suppressContentEditableWarning={true}
             data-placeholder="اكتب اسم المدينة..."
             onBlur={(e) => handleHeaderBlur('pageCity', e)}
-            title="المدينة (انقر للتعديل وسيتم الفرز تلقائياً)"
+            title={isReadOnly ? 'المدينة (وضع القراءة فقط)' : 'المدينة (انقر للتعديل وسيتم الفرز تلقائياً)'}
           >
             {city}
           </div>
@@ -121,12 +138,14 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIn
           </div>
           <span className="text-xs font-bold text-slate-500 flex-shrink-0">المنطقة:</span>
           <div
-            className={`flex-1 font-bold text-sm text-slate-800 outline-none px-1.5 py-0.5 rounded cursor-text hover:bg-slate-50 ${mReg}`}
-            contentEditable={true}
+            className={`flex-1 font-bold text-sm text-slate-800 outline-none px-1.5 py-0.5 rounded ${
+              isReadOnly ? 'cursor-default select-text' : 'cursor-text hover:bg-slate-50'
+            } ${mReg}`}
+            contentEditable={!isReadOnly}
             suppressContentEditableWarning={true}
             data-placeholder="اكتب اسم المنطقة..."
             onBlur={(e) => handleHeaderBlur('pageRegion', e)}
-            title="المنطقة (انقر للتعديل وسيتم الفرز تلقائياً)"
+            title={isReadOnly ? 'المنطقة (وضع القراءة فقط)' : 'المنطقة (انقر للتعديل وسيتم الفرز تلقائياً)'}
           >
             {region}
           </div>

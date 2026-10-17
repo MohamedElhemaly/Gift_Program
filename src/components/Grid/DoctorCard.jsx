@@ -19,6 +19,7 @@ import {
   Sparkles,
   MapPin,
   Stethoscope,
+  Lock,
 } from 'lucide-react';
 
 function DoctorCard({ doc, index, isHighlighted = false }) {
@@ -30,12 +31,23 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
     openMaximizeModal,
     openAddDoctorModal,
     showEmptySlotsOnScreen,
+    filters,
   } = useDoctorStore();
+
+  const isReadOnly = Boolean(
+    (filters?.governorate && filters.governorate.trim()) ||
+    (filters?.city && filters.city.trim()) ||
+    (filters?.region && filters.region.trim()) ||
+    (filters?.specialty && filters.specialty.trim()) ||
+    (filters?.searchTerm && filters.searchTerm.trim()) ||
+    (filters?.status && filters.status !== 'all')
+  );
 
   const updateFieldMutation = useUpdateDoctorFieldMutation();
   const toggleInactiveMutation = useToggleInactiveMutation();
 
   const handleBlur = (field, e) => {
+    if (isReadOnly) return;
     const val = e.currentTarget.innerText.trim();
     const oldVal = String(doc[field] || '').trim();
     if (val === oldVal) return;
@@ -55,6 +67,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
   };
 
   const handleToggleInactive = () => {
+    if (isReadOnly) return;
     const currentInactive = Boolean(doc.is_inactive);
     const targetState = !currentInactive;
 
@@ -128,12 +141,12 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                 {/* Serial Counter Badge */}
                 <span
                   className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 ${getModClass('counter')}`}
-                  title="المسلسل (انقر للتعديل)"
+                  title={isReadOnly ? 'وضع القراءة فقط' : 'المسلسل (انقر للتعديل)'}
                 >
                   <Hash className="w-3 h-3 text-slate-400 select-none" />
                   <span
-                    className="outline-none cursor-text min-w-[12px] text-center"
-                    contentEditable={true}
+                    className={`outline-none min-w-[12px] text-center ${isReadOnly ? 'cursor-default select-text' : 'cursor-text'}`}
+                    contentEditable={!isReadOnly}
                     suppressContentEditableWarning={true}
                     data-placeholder="م"
                     onBlur={(e) => handleBlur('counter', e)}
@@ -154,63 +167,77 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                 </div>
               </div>
 
-              {/* Action Buttons Toolbar */}
-              <div className="flex items-center gap-0.5 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200">
-                <button
-                  type="button"
-                  className="p-1 rounded-md text-slate-700 hover:bg-white hover:text-blue-700 transition-colors cursor-pointer"
-                  onClick={() => openMaximizeModal(index)}
-                  title="تكبير وتعديل كامل"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
+              {/* Action Buttons Toolbar (Hidden in Read-Only Mode) */}
+              {!isReadOnly ? (
+                <div className="flex items-center gap-0.5 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    className="p-1 rounded-md text-slate-700 hover:bg-white hover:text-blue-700 transition-colors cursor-pointer"
+                    onClick={() => openMaximizeModal(index)}
+                    title="تكبير وتعديل كامل"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
 
-                <button
-                  type="button"
-                  className="p-1 rounded-md text-blue-600 hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer"
-                  onClick={() => openMoveModal(index)}
-                  title="نقل الطبيب لوجهة أخرى"
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    className="p-1 rounded-md text-blue-600 hover:bg-blue-100 hover:text-blue-800 transition-colors cursor-pointer"
+                    onClick={() => openMoveModal(index)}
+                    title="نقل الطبيب لوجهة أخرى"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                  </button>
 
-                <button
-                  type="button"
-                  className="p-1 rounded-md text-purple-600 hover:bg-purple-100 hover:text-purple-800 transition-colors cursor-pointer"
-                  onClick={() => openCombineModal(index)}
-                  title="دمج طبيب آخر مع هذا الطبيب"
-                >
-                  <GitMerge className="w-3.5 h-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    className="p-1 rounded-md text-purple-600 hover:bg-purple-100 hover:text-purple-800 transition-colors cursor-pointer"
+                    onClick={() => openCombineModal(index)}
+                    title="دمج طبيب آخر مع هذا الطبيب"
+                  >
+                    <GitMerge className="w-3.5 h-3.5" />
+                  </button>
 
-                <button
-                  type="button"
-                  className={`p-1 rounded-md transition-colors cursor-pointer ${
-                    doc.is_inactive
-                      ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
-                      : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
-                  }`}
-                  onClick={handleToggleInactive}
-                  title={doc.is_inactive ? 'إعادة تفعيل الطبيب' : 'إيقاف مؤقت (إخفاء في الطباعة)'}
+                  <button
+                    type="button"
+                    className={`p-1 rounded-md transition-colors cursor-pointer ${
+                      doc.is_inactive
+                        ? 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                        : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                    }`}
+                    onClick={handleToggleInactive}
+                    title={doc.is_inactive ? 'إعادة تفعيل الطبيب' : 'إيقاف مؤقت (إخفاء في الطباعة)'}
+                  >
+                    {doc.is_inactive ? (
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <UserX className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="flex items-center gap-1 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md text-[10px] font-bold text-amber-800 select-none shadow-2xs"
+                  title="وضع القراءة فقط: مسح الفلاتر والبحث للتمكن من التعديل"
                 >
-                  {doc.is_inactive ? (
-                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  ) : (
-                    <UserX className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              </div>
+                  <Lock className="w-3 h-3 text-amber-600" />
+                  <span>قراءة فقط</span>
+                </div>
+              )}
             </div>
 
             {/* Doctor Name */}
             <div
-              className={`font-bold text-base text-slate-900 leading-snug px-1.5 py-1 rounded hover:bg-blue-50/50 cursor-text transition-colors border border-transparent hover:border-blue-200 ${getModClass('name')}`}
-              contentEditable={true}
+              className={`font-bold text-base text-slate-900 leading-snug px-1.5 py-1 rounded transition-colors border border-transparent ${
+                isReadOnly ? 'cursor-default select-text' : 'hover:bg-blue-50/50 cursor-text hover:border-blue-200'
+              } ${getModClass('name')}`}
+              contentEditable={!isReadOnly}
               suppressContentEditableWarning={true}
               data-placeholder="اسم الطبيب..."
-              onClick={(e) => e.currentTarget.focus()}
+              onClick={(e) => {
+                if (!isReadOnly) e.currentTarget.focus();
+              }}
               onBlur={(e) => handleBlur('name', e)}
-              title="اسم الطبيب (انقر للتعديل)"
+              title={isReadOnly ? 'اسم الطبيب (وضع القراءة فقط)' : 'اسم الطبيب (انقر للتعديل)'}
             >
               {cleanDoctorName(doc.name, doc.doc_code) || doc.name || (doc.doc_code ? `طبيب (كود: ${doc.doc_code})` : '')}
             </div>
@@ -221,17 +248,17 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
               <div
                 className={`inline-flex items-center gap-1.5 text-xs max-w-full transition-colors ${
                   specVal
-                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md w-fit cursor-text hover:border-blue-300 ${getModClass('specialty')}`
-                    : `text-slate-400 px-1 py-0.5 rounded cursor-text hover:bg-slate-100/60 w-fit ${getModClass('specialty')}`
+                    ? `font-semibold text-blue-700 bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md w-fit ${isReadOnly ? 'cursor-default' : 'cursor-text hover:border-blue-300'} ${getModClass('specialty')}`
+                    : `text-slate-400 px-1 py-0.5 rounded ${isReadOnly ? 'cursor-default' : 'cursor-text hover:bg-slate-100/60'} w-fit ${getModClass('specialty')}`
                 }`}
-                title={`التخصص: ${specVal || 'انقر للتعديل'}`}
+                title={isReadOnly ? `التخصص: ${specVal || 'غير محدد'}` : `التخصص: ${specVal || 'انقر للتعديل'}`}
               >
                 <Stethoscope className={`w-3.5 h-3.5 flex-shrink-0 select-none ${specVal ? 'text-blue-500' : 'text-slate-400 opacity-60'}`} />
                 <span
-                  contentEditable={true}
+                  contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="التخصص..."
-                  className="outline-none min-w-[30px] truncate max-w-[200px] inline-block align-middle"
+                  className={`outline-none min-w-[30px] truncate max-w-[200px] inline-block align-middle ${isReadOnly ? 'cursor-default' : ''}`}
                   onBlur={(e) => handleBlur('specialty', e)}
                 >
                   {specVal}
@@ -240,15 +267,17 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
 
               {/* Address */}
               <div
-                className={`text-xs text-slate-600 px-1 py-0.5 rounded hover:bg-slate-100/70 cursor-text transition-colors flex items-start gap-1 leading-relaxed max-w-full ${getModClass('address')}`}
-                title={`العنوان ومقر العيادة: ${addrVal || 'انقر للتعديل'}`}
+                className={`text-xs text-slate-600 px-1 py-0.5 rounded transition-colors flex items-start gap-1 leading-relaxed max-w-full ${
+                  isReadOnly ? 'cursor-default select-text' : 'hover:bg-slate-100/70 cursor-text'
+                } ${getModClass('address')}`}
+                title={isReadOnly ? `العنوان: ${addrVal || 'غير محدد'}` : `العنوان ومقر العيادة: ${addrVal || 'انقر للتعديل'}`}
               >
                 <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5 select-none" />
                 <span
-                  contentEditable={true}
+                  contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="العنوان والعيادة..."
-                  className="outline-none min-w-[50px] flex-1 line-clamp-1 truncate"
+                  className={`outline-none min-w-[50px] flex-1 line-clamp-1 truncate ${isReadOnly ? 'cursor-default' : ''}`}
                   onBlur={(e) => handleBlur('address', e)}
                 >
                   {addrVal}
@@ -280,16 +309,18 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
             <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200/70">
               {/* Old Stats */}
               <div
-                className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-amber-200 hover:border-amber-400 cursor-text transition-colors ${getModClass('old_stats')}`}
-                title="الحالات السابقة (انقر للتعديل)"
+                className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-amber-200 transition-colors ${
+                  isReadOnly ? 'cursor-default' : 'hover:border-amber-400 cursor-text'
+                } ${getModClass('old_stats')}`}
+                title={isReadOnly ? 'الحالات السابقة (للقراءة فقط)' : 'الحالات السابقة (انقر للتعديل)'}
               >
                 <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1 select-none">
                   <Activity className="w-3 h-3 text-amber-500" />
                   القديم:
                 </span>
                 <span
-                  className="font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center"
-                  contentEditable={true}
+                  className={`font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center ${isReadOnly ? 'cursor-default' : ''}`}
+                  contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="0"
                   onBlur={(e) => handleBlur('old_stats', e)}
@@ -300,16 +331,18 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
 
               {/* New Stats */}
               <div
-                className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-emerald-200 hover:border-emerald-400 cursor-text transition-colors ${getModClass('new_stats')}`}
-                title="الحالات الجديدة (انقر للتعديل)"
+                className={`flex items-center justify-between px-2 py-1 rounded bg-white border border-emerald-200 transition-colors ${
+                  isReadOnly ? 'cursor-default' : 'hover:border-emerald-400 cursor-text'
+                } ${getModClass('new_stats')}`}
+                title={isReadOnly ? 'الحالات الجديدة (للقراءة فقط)' : 'الحالات الجديدة (انقر للتعديل)'}
               >
                 <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 select-none">
                   <Sparkles className="w-3 h-3 text-emerald-500" />
                   الجديد:
                 </span>
                 <span
-                  className="font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center"
-                  contentEditable={true}
+                  className={`font-mono font-bold text-xs text-slate-800 outline-none min-w-[15px] text-center ${isReadOnly ? 'cursor-default' : ''}`}
+                  contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="0"
                   onBlur={(e) => handleBlur('new_stats', e)}
@@ -322,15 +355,17 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
             {/* Bottom Row: Phone Contacts */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-700 font-medium gap-1">
               <div
-                className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text min-w-0 max-w-[50%] ${getModClass('mobile')}`}
-                title={`رقم الموبايل: ${mobileVal || 'انقر للتعديل'}`}
+                className={`flex items-center gap-1.5 px-1 py-0.5 rounded min-w-0 max-w-[50%] ${
+                  isReadOnly ? 'cursor-default select-text' : 'hover:bg-slate-100/60 cursor-text'
+                } ${getModClass('mobile')}`}
+                title={isReadOnly ? `موبايل: ${mobileVal || 'غير مسجل'}` : `رقم الموبايل: ${mobileVal || 'انقر للتعديل'}`}
               >
                 <Smartphone className="w-3.5 h-3.5 text-slate-400 select-none flex-shrink-0" />
                 <span
-                  contentEditable={true}
+                  contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="موبايل..."
-                  className="outline-none min-w-[35px] truncate font-mono"
+                  className={`outline-none min-w-[35px] truncate font-mono ${isReadOnly ? 'cursor-default' : ''}`}
                   onBlur={(e) => handleBlur('mobile', e)}
                 >
                   {mobileVal}
@@ -338,15 +373,17 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
               </div>
 
               <div
-                className={`flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-slate-100/60 cursor-text min-w-0 max-w-[50%] justify-end ${getModClass('home_tel')}`}
-                title={`رقم الهاتف الأرضي: ${homeTelVal || 'انقر للتعديل'}`}
+                className={`flex items-center gap-1.5 px-1 py-0.5 rounded min-w-0 max-w-[50%] justify-end ${
+                  isReadOnly ? 'cursor-default select-text' : 'hover:bg-slate-100/60 cursor-text'
+                } ${getModClass('home_tel')}`}
+                title={isReadOnly ? `أرضي: ${homeTelVal || 'غير مسجل'}` : `رقم الهاتف الأرضي: ${homeTelVal || 'انقر للتعديل'}`}
               >
                 <Phone className="w-3.5 h-3.5 text-slate-400 select-none flex-shrink-0" />
                 <span
-                  contentEditable={true}
+                  contentEditable={!isReadOnly}
                   suppressContentEditableWarning={true}
                   data-placeholder="أرضي..."
-                  className="outline-none min-w-[35px] truncate font-mono text-left"
+                  className={`outline-none min-w-[35px] truncate font-mono text-left ${isReadOnly ? 'cursor-default' : ''}`}
                   onBlur={(e) => handleBlur('home_tel', e)}
                 >
                   {homeTelVal}
@@ -363,15 +400,21 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
               <Hash className="w-3 h-3" />
               <span>خانة فارغة للطباعة ({doc.counter || index + 1})</span>
             </span>
-            <button
-              type="button"
-              onClick={() => openAddDoctorModal({ pageGvr: doc.pageGvr, pageCity: doc.pageCity, pageRegion: doc.pageRegion })}
-              className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-dashed border-blue-300 text-blue-600 bg-blue-50/60 hover:bg-blue-100 hover:border-blue-400 font-bold text-xs transition-all cursor-pointer shadow-2xs"
-              title="إضافة طبيب في هذه الخانة"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>إضافة طبيب في هذه الخانة</span>
-            </button>
+            {!isReadOnly ? (
+              <button
+                type="button"
+                onClick={() => openAddDoctorModal({ pageGvr: doc.pageGvr, pageCity: doc.pageCity, pageRegion: doc.pageRegion })}
+                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-dashed border-blue-300 text-blue-600 bg-blue-50/60 hover:bg-blue-100 hover:border-blue-400 font-bold text-xs transition-all cursor-pointer shadow-2xs"
+                title="إضافة طبيب في هذه الخانة"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>إضافة طبيب في هذه الخانة</span>
+              </button>
+            ) : (
+              <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md select-none">
+                🔒 خانة شاغرة (وضع القراءة فقط)
+              </span>
+            )}
           </div>
         )}
 

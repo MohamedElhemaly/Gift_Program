@@ -14,6 +14,8 @@ import {
   X,
   Target,
   Hash,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,8 +27,18 @@ export default function ReportView({ selectedPages = null }) {
     autoSaveState,
     filters,
     setFilter,
+    resetFilters,
     openPrintModal,
   } = useDoctorStore();
+
+  const isReadOnly = Boolean(
+    (filters?.governorate && filters.governorate.trim()) ||
+    (filters?.city && filters.city.trim()) ||
+    (filters?.region && filters.region.trim()) ||
+    (filters?.specialty && filters.specialty.trim()) ||
+    (filters?.searchTerm && filters.searchTerm.trim()) ||
+    (filters?.status && filters.status !== 'all')
+  );
 
   // Screen Pagination & Jump State
   const [currentPage, setCurrentPage] = useState(1);
@@ -242,15 +254,17 @@ export default function ReportView({ selectedPages = null }) {
 
           {/* Quick Actions (Add Doctor & Print) */}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openAddDoctorModal()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
-              title="إضافة طبيب جديد"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>إضافة طبيب</span>
-            </button>
+            {!isReadOnly && (
+              <button
+                type="button"
+                onClick={() => openAddDoctorModal()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xs transition-colors cursor-pointer"
+                title="إضافة طبيب جديد"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>إضافة طبيب</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -411,6 +425,40 @@ export default function ReportView({ selectedPages = null }) {
           </div>
         </div>
       </div>
+
+      {/* 🔒 Strict Read-Only Mode Sticky Alert Banner (Active during any search or filter) */}
+      {isReadOnly && (
+        <div className="no-print sticky top-[138px] z-30 mb-6 bg-gradient-to-r from-amber-50 via-amber-100/70 to-amber-50 border-2 border-amber-300 text-amber-950 px-4 py-3 rounded-2xl shadow-sm backdrop-blur-md flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs flex-shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-amber-950">
+                  وضع القراءة فقط مفعّل (أثناء الفلترة والبحث)
+                </span>
+                <span className="bg-amber-200/90 text-amber-900 text-[10px] font-bold px-2.5 py-0.5 rounded-full select-none border border-amber-300">
+                  🔒 التعديل معطل لحماية البيانات
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 font-medium mt-0.5">
+                وضع القراءة فقط: يرجى مسح الفلاتر والبحث للتمكن من التعديل
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 shadow-xs hover:shadow transition-all cursor-pointer flex-shrink-0"
+            title="مسح جميع الفلاتر ومصطلح البحث واستعادة وضع التعديل فوراً"
+          >
+            <Unlock className="w-4 h-4" />
+            <span>مسح الفلاتر والبحث (استعادة التعديل)</span>
+          </button>
+        </div>
+      )}
 
       {/* Rendered A4 Pages */}
       {visiblePages.length === 0 ? (

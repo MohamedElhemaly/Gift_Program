@@ -92,34 +92,11 @@ export default function ControlPanel({ onPrint }) {
           )}
         </div>
 
-        {/* Left side: View Mode switcher & Blank slots toggle */}
+        {/* Left side: Location badge & Blank slots toggle */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Segmented Display Mode Switcher */}
-          <div className="inline-flex items-center p-1 bg-white rounded-xl border border-slate-200 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setDistributionMode('continuous')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                distributionMode === 'continuous'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="توزيع متتالي: ملء صفحات الـ 21 خانة بالكامل بدون أي خانات فارغة"
-            >
-              <span>📄 توزيع متتالي (21/صفحة كاملة)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDistributionMode('by_region')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                distributionMode === 'by_region'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="توزيع حسب المنطقة: صفحة مستقلة لكل منطقة جغرافية"
-            >
-              <span>🗺️ صفحة لكل منطقة</span>
-            </button>
+          {/* Strict Location-Based Pagination Badge */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-xl border border-blue-200 text-blue-900 text-xs font-bold shadow-2xs select-none">
+            <span>🗺️ توزيع معتمد حسب المنطقة (صفحة مستقلة لكل موقع)</span>
           </div>
 
           {/* Toggle Empty Slots on Screen */}
@@ -176,8 +153,14 @@ export default function ControlPanel({ onPrint }) {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
+            disabled={hasActiveFilters}
             onClick={() => openAddDoctorModal()}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 text-white font-bold rounded-xl cursor-pointer transition-all bg-blue-600 hover:bg-blue-700 shadow-xs hover:shadow text-xs"
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-white font-bold rounded-xl transition-all shadow-xs text-xs ${
+              hasActiveFilters
+                ? 'bg-slate-400 cursor-not-allowed opacity-60'
+                : 'bg-blue-600 hover:bg-blue-700 hover:shadow cursor-pointer'
+            }`}
+            title={hasActiveFilters ? 'معطل في وضع القراءة فقط (امسح الفلاتر للإضافة)' : 'إضافة طبيب جديد'}
           >
             <UserPlus className="w-4 h-4" />
             <span>➕ إضافة طبيب جديد</span>
@@ -185,8 +168,14 @@ export default function ControlPanel({ onPrint }) {
 
           <button
             type="button"
+            disabled={hasActiveFilters}
             onClick={() => setIsBlankPageModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 text-slate-700 font-bold rounded-xl cursor-pointer transition-all bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs shadow-2xs"
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 font-bold rounded-xl border text-xs shadow-2xs transition-all ${
+              hasActiveFilters
+                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-60'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 cursor-pointer'
+            }`}
+            title={hasActiveFilters ? 'معطل في وضع القراءة فقط (امسح الفلاتر للإضافة)' : 'إضافة صفحة فارغة'}
           >
             <PlusCircle className="w-4 h-4 text-slate-500" />
             <span>➕ إضافة صفحة فارغة</span>

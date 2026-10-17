@@ -240,72 +240,87 @@ export const useDoctorStore = create((set, get) => ({
   },
 
   /**
-   * The core 21-item sorting, group-by, and padding algorithm - OPTIMIZED FOR 15,000+ ITEMS
+   * STRICT LOCATION-BASED PAGINATION & CHUNKING ALGORITHM (NO LOCATION MIXING)
+   * 1. Group dataset by location hierarchy (pageGvr -> pageCity -> pageRegion)
+   * 2. For each location group, chunk into 21 items
+   * 3. Pad the last chunk of each location group with empty placeholders to reach 21 items
+   * 4. Enforce page breaks between different locations so no two locations ever share an A4 page
    */
   rebuildData: (inputDocs = null) => {
     let list = inputDocs;
     if (!list) {
-      const hasActiveFilters = Object.entries(get().filters || {}).some(([k, v]) => v && v !== 'all');
+      const f = get().filters || {};
+      const hasActiveFilters = Boolean(
+        (f.governorate && f.governorate.trim()) ||
+        (f.city && f.city.trim()) ||
+        (f.region && f.region.trim()) ||
+        (f.specialty && f.specialty.trim()) ||
+        (f.searchTerm && f.searchTerm.trim()) ||
+        (f.status && f.status !== 'all')
+      );
       list = hasActiveFilters ? get().getFilteredDoctors() : get().rawDoctors;
     }
+
     if (!list || list.length === 0) {
       set({ displayedDoctors: [] });
       return;
     }
 
-    const mode = get().distributionMode || 'continuous';
+    // Keep only real doctor objects (ignore pure empty padding from previous state)
+    const realDocs = list.filter(
+      (d) => d && (d.name || d.doc_code || d.specialty || d.address || d.id)
+    );
 
-    // Normalize gvr, city, region on all objects
-    list = list.map((d) => {
-      const g = (d.pageGvr || d.gvr || 'غير محدد').trim();
-      const c = (d.pageCity || d.city || '').trim();
-      const r = (d.pageRegion || d.region || '').trim();
-      return {
-        ...d,
-        gvr: g,
-        pageGvr: g,
-        city: c,
-        pageCity: c,
-        region: r,
-        pageRegion: r,
-      };
+    if (realDocs.length === 0) {
+      set({ displayedDoctors: [] });
+      return;
+    }
+
+    // 1. Group strictly by location hierarchy (pageGvr -> pageCity -> pageRegion)
+    const groups = {};
+    for (let i = 0; i < realDocs.length; i++) {
+      const doc = realDocs[i];
+      const gvr = (doc.pageGvr || doc.gvr || 'غير محدد').trim();
+      const city = (doc.pageCity || doc.city || '').trim();
+      const reg = (doc.pageRegion || doc.region || '').trim();
+      const key = `${gvr}::${city || 'بدون مدينة'}::${reg || 'بدون منطقة'}`;
+
+      if (!groups[key]) groups[key] = [];
+      groups[key].push({
+        ...doc,
+        pageGvr: gvr,
+        pageCity: city,
+        pageRegion: reg,
+      });
+    }
+
+    // 2. Sort location groups hierarchically (Governorate -> City -> Region)
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const [gvrA, cityA, regA] = a.split('::');
+      const [gvrB, cityB, regB] = b.split('::');
+
+      const isAUnk = gvrA === 'غير محدد';
+      const isBUnk = gvrB === 'غير محدد';
+      if (isAUnk && !isBUnk) return 1;
+      if (!isAUnk && isBUnk) return -1;
+
+      const gCmp = gvrA.localeCompare(gvrB, 'ar');
+      if (gCmp !== 0) return gCmp;
+
+      const cCmp = (cityA || '').localeCompare(cityB || '', 'ar');
+      if (cCmp !== 0) return cCmp;
+
+      return (regA || '').localeCompare(regB || '', 'ar');
     });
 
-    // =========================================================================
-    // MODE 1: CONTINUOUS FLOW (التوزيع المتتالي الكامل - كل صفحة 21 طبيب بالكامل)
-    // =========================================================================
-    if (mode === 'continuous') {
-      const realDocs = list.filter((d) => d && (d.name || d.doc_code || d.specialty || d.address));
-      
-      realDocs.sort((a, b) => {
-        const isGovA = Boolean(a.pageGvr && a.pageGvr !== 'غير محدد');
-        const isGovB = Boolean(b.pageGvr && b.pageGvr !== 'غير محدد');
-        if (isGovA && !isGovB) return -1;
-        if (!isGovA && isGovB) return 1;
+    const formattedList = [];
 
-        if (isGovA && isGovB) {
-          const gCmp = (a.pageGvr || '').localeCompare(b.pageGvr || '', 'ar');
-          if (gCmp !== 0) return gCmp;
+    // 3. Process each location group and apply the strict padding rule
+    for (let k = 0; k < groupKeys.length; k++) {
+      const gDocs = groups[groupKeys[k]];
 
-          const hasCityA = Boolean(a.pageCity);
-          const hasCityB = Boolean(b.pageCity);
-          if (hasCityA && !hasCityB) return -1;
-          if (!hasCityA && hasCityB) return 1;
-          if (hasCityA && hasCityB) {
-            const cCmp = (a.pageCity || '').localeCompare(b.pageCity || '', 'ar');
-            if (cCmp !== 0) return cCmp;
-          }
-
-          const hasRegA = Boolean(a.pageRegion);
-          const hasRegB = Boolean(b.pageRegion);
-          if (hasRegA && !hasRegB) return -1;
-          if (!hasRegA && hasRegB) return 1;
-          if (hasRegA && hasRegB) {
-            const rCmp = (a.pageRegion || '').localeCompare(b.pageRegion || '', 'ar');
-            if (rCmp !== 0) return rCmp;
-          }
-        }
-
+      // Sort doctors inside this specific location group
+      gDocs.sort((a, b) => {
         const isFallbackA = (a.name || '').startsWith('طبيب (كود:');
         const isFallbackB = (b.name || '').startsWith('طبيب (كود:');
         if (!isFallbackA && isFallbackB) return -1;
@@ -323,81 +338,6 @@ export const useDoctorStore = create((set, get) => ({
         return (parseInt(a.doc_code, 10) || 0) - (parseInt(b.doc_code, 10) || 0);
       });
 
-      const rem = realDocs.length % 21;
-      const needed = realDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
-
-      const continuousList = [...realDocs];
-      const lastDoc = continuousList[continuousList.length - 1] || {};
-      for (let i = 0; i < needed; i++) {
-        continuousList.push({
-          pageGvr: lastDoc.pageGvr || 'غير محدد',
-          pageCity: lastDoc.pageCity || '',
-          pageRegion: lastDoc.pageRegion || '',
-          pageGvr_modified: false,
-          pageCity_modified: false,
-          pageRegion_modified: false,
-          name: '',
-          specialty: '',
-          address: '',
-          mobile: '',
-          home_tel: '',
-          old_stats: '',
-          new_stats: '',
-          counter: '',
-          doc_code: '',
-          is_moved: false,
-          moved_from: '',
-          is_inactive: false,
-          merged_codes: [],
-          is_blank_placeholder: true,
-        });
-      }
-
-      for (let idx = 0; idx < continuousList.length; idx++) {
-        const pageItemIndex = (idx % 21) + 1;
-        const d = continuousList[idx];
-        d.counter = d.doc_code || d.name ? pageItemIndex : '';
-      }
-
-      if (inputDocs) {
-        set({ displayedDoctors: continuousList, rawDoctors: inputDocs });
-      } else {
-        set({ displayedDoctors: continuousList });
-      }
-      return;
-    }
-
-    // =========================================================================
-    // MODE 2: BY REGION (توزيع حسب المنطقة - النمط الأصلي للطباعة)
-    // =========================================================================
-    const groups = {};
-    for (let i = 0; i < list.length; i++) {
-      const doc = list[i];
-      const gvr = (doc.pageGvr || doc.gvr || 'غير محدد').trim();
-      const city = (doc.pageCity || doc.city || '').trim();
-      const reg = (doc.pageRegion || doc.region || '').trim();
-      const key = `${gvr}::${city || 'بدون مدينة'}::${reg || 'بدون منطقة'}`;
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push({
-        ...doc,
-        pageGvr: gvr,
-        pageCity: city,
-        pageRegion: reg,
-      });
-    }
-
-    const formattedList = [];
-    const groupKeys = Object.keys(groups).sort((a, b) => {
-      const isAUnk = a.startsWith('غير محدد');
-      const isBUnk = b.startsWith('غير محدد');
-      if (isAUnk && !isBUnk) return 1;
-      if (!isAUnk && isBUnk) return -1;
-      return a.localeCompare(b, 'ar');
-    });
-
-    for (let k = 0; k < groupKeys.length; k++) {
-      const gDocs = groups[groupKeys[k]];
       const cGvr = gDocs[0].pageGvr || 'غير محدد';
       const cCity = gDocs[0].pageCity || '';
       const cReg = gDocs[0].pageRegion || '';
@@ -405,15 +345,7 @@ export const useDoctorStore = create((set, get) => ({
       const cCityMod = Boolean(gDocs[0].pageCity_modified);
       const cRegMod = Boolean(gDocs[0].pageRegion_modified);
 
-      while (gDocs.length > 0) {
-        const last = gDocs[gDocs.length - 1];
-        if (!last.name && !last.specialty && !last.address && !last.old_stats && !last.new_stats && !last.doc_code) {
-          gDocs.pop();
-        } else {
-          break;
-        }
-      }
-
+      // 4. The Padding Rule: If the last chunk has fewer than 21 doctors, pad to 21
       const rem = gDocs.length % 21;
       const needed = gDocs.length === 0 ? 21 : rem !== 0 ? 21 - rem : 0;
 
@@ -442,9 +374,11 @@ export const useDoctorStore = create((set, get) => ({
         });
       }
 
+      // 5. Assign page counter (1 to 21) on each page
       for (let idx = 0; idx < gDocs.length; idx++) {
         const d = gDocs[idx];
-        d.counter = d.doc_code || d.name ? idx + 1 : '';
+        const pageItemIndex = (idx % 21) + 1;
+        d.counter = d.doc_code || d.name ? pageItemIndex : '';
         formattedList.push(d);
       }
     }

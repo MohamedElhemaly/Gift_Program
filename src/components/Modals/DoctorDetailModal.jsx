@@ -106,6 +106,35 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
     .filter(Boolean);
   const locationLabel = locationParts.length > 0 ? locationParts.join(' - ') : 'بدون تحديد موقع';
 
+  const isManuallyModified = Boolean(
+    doc.is_moved ||
+    doc.is_modified ||
+    doc.name_modified ||
+    doc.specialty_modified ||
+    doc.address_modified ||
+    doc.mobile_modified ||
+    doc.home_tel_modified ||
+    doc.old_stats_modified ||
+    doc.new_stats_modified ||
+    doc.counter_modified ||
+    doc.pageGvr_modified ||
+    doc.pageCity_modified ||
+    doc.pageRegion_modified ||
+    (doc.merged_codes && doc.merged_codes.length > 0)
+  );
+
+  const getFieldClass = (field, defaultActiveClasses) => {
+    if (doc[field + '_modified']) {
+      return `!bg-[#ffeb3b] !text-black font-bold !border-yellow-500 ring-2 ring-yellow-400 shadow-2xs ${
+        isReadOnlyMode ? 'cursor-not-allowed select-text' : 'focus:ring-2 focus:ring-yellow-500 focus:border-yellow-600'
+      }`;
+    }
+    if (isReadOnlyMode) {
+      return 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text';
+    }
+    return defaultActiveClasses;
+  };
+
   const isPlaceholder = Boolean(
     doc.is_blank_placeholder ||
     (!doc.id && !doc.doc_code && !doc.name?.trim() && !doc.specialty?.trim() && !doc.address?.trim())
@@ -191,7 +220,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
   }
 
   // =========================================================================
-  // STATE B: REAL DOCTOR CARD (With Strict Read-Only Support)
+  // STATE B: REAL DOCTOR CARD (With Strict Read-Only Support & Yellow Highlights)
   // =========================================================================
   return (
     <div className="modal-overlay animate-fadeIn" onClick={onClose}>
@@ -239,7 +268,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
               </h2>
             </div>
 
-            {/* Badges: Code, Location, Status */}
+            {/* Badges: Code, Location, Status, Modifications */}
             <div className="flex items-center gap-2 flex-wrap pt-0.5">
               {/* Doctor Code Badge */}
               <div
@@ -289,10 +318,17 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   <span>+ مدمج مع: {doc.merged_codes.join(', ')}</span>
                 </span>
               )}
+
+              {/* Universal Modification Indicator Badge */}
+              {isManuallyModified && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-[#ffeb3b] text-black border border-yellow-400 shadow-2xs">
+                  <span>✏️ معدل يدوياً</span>
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Action Toolbar (Hidden or locked in Read-Only Mode) */}
+          {/* Action Toolbar */}
           <div className="flex items-center gap-2 flex-shrink-0 self-start">
             {!isReadOnlyMode ? (
               <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs">
@@ -426,7 +462,7 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
 
             <div className="grid grid-cols-3 gap-3">
               {/* Counter / Position */}
-              <div className={`p-2.5 rounded-xl border shadow-2xs ${isReadOnlyMode ? 'bg-slate-100/70 border-slate-200' : 'bg-white border-blue-100'}`}>
+              <div className={`p-2.5 rounded-xl border shadow-2xs ${doc.counter_modified ? 'bg-yellow-50 border-yellow-300' : isReadOnlyMode ? 'bg-slate-100/70 border-slate-200' : 'bg-white border-blue-100'}`}>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1 text-center">
                   المسلسل (م)
                 </label>
@@ -437,16 +473,15 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('counter', e.target.value)}
                   placeholder="1"
-                  className={`w-full p-2 border rounded-lg text-sm font-black text-center transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'text-slate-800 bg-slate-50/60 hover:bg-white focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-slate-200'
-                  }`}
+                  className={`w-full p-2 border rounded-lg text-sm font-black text-center transition-all outline-none ${getFieldClass(
+                    'counter',
+                    'text-slate-800 bg-slate-50/60 hover:bg-white focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border-slate-200'
+                  )}`}
                 />
               </div>
 
               {/* Old Stats */}
-              <div className={`p-2.5 rounded-xl border shadow-2xs ${isReadOnlyMode ? 'bg-slate-100/70 border-slate-200' : 'bg-white border-amber-200'}`}>
+              <div className={`p-2.5 rounded-xl border shadow-2xs ${doc.old_stats_modified ? 'bg-yellow-50 border-yellow-300' : isReadOnlyMode ? 'bg-slate-100/70 border-slate-200' : 'bg-white border-amber-200'}`}>
                 <label className="block text-[11px] font-bold text-amber-800 mb-1 flex items-center justify-center gap-1">
                   <Activity className="w-3 h-3 text-amber-600" />
                   <span>الحالات القديمة</span>
@@ -458,16 +493,15 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('old_stats', e.target.value)}
                   placeholder="0"
-                  className={`w-full p-2 border rounded-lg text-sm font-black text-center transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'text-amber-900 bg-amber-50/30 hover:bg-white focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 border-amber-200'
-                  }`}
+                  className={`w-full p-2 border rounded-lg text-sm font-black text-center transition-all outline-none ${getFieldClass(
+                    'old_stats',
+                    'text-amber-900 bg-amber-50/30 hover:bg-white focus:bg-white focus:ring-2 focus:ring-amber-500 focus:border-amber-500 border-amber-200'
+                  )}`}
                 />
               </div>
 
               {/* New Stats */}
-              <div className={`p-2.5 rounded-xl border shadow-2xs ${isReadOnlyMode ? 'bg-slate-100/70 border-slate-200' : 'bg-white border-emerald-200'}`}>
+              <div className={`p-2.5 rounded-xl border shadow-2xs ${doc.new_stats_modified ? 'bg-yellow-50 border-yellow-300' : isReadOnlyMode ? 'bg-slate-100/70 border-slate-200' : 'bg-white border-emerald-200'}`}>
                 <label className="block text-[11px] font-bold text-emerald-800 mb-1 flex items-center justify-center gap-1">
                   <Sparkles className="w-3 h-3 text-emerald-600" />
                   <span>الحالات الجديدة</span>
@@ -479,11 +513,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('new_stats', e.target.value)}
                   placeholder="0"
-                  className={`w-full p-2 border rounded-lg text-sm font-black text-center transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'text-emerald-900 bg-emerald-50/30 hover:bg-white focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 border-emerald-200'
-                  }`}
+                  className={`w-full p-2 border rounded-lg text-sm font-black text-center transition-all outline-none ${getFieldClass(
+                    'new_stats',
+                    'text-emerald-900 bg-emerald-50/30 hover:bg-white focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 border-emerald-200'
+                  )}`}
                 />
               </div>
             </div>
@@ -506,11 +539,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                 readOnly={isReadOnlyMode}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
                 placeholder="مثال: أ.د/ محمد أحمد علي"
-                className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-bold transition-all outline-none ${
-                  isReadOnlyMode
-                    ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                    : 'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                }`}
+                className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-bold transition-all outline-none ${getFieldClass(
+                  'name',
+                  'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                )}`}
               />
             </div>
 
@@ -529,11 +561,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('mobile', e.target.value)}
                   placeholder="مثال: 01012345678"
-                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-mono font-medium transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
+                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-mono font-medium transition-all outline-none ${getFieldClass(
+                    'mobile',
+                    'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  )}`}
                 />
               </div>
 
@@ -550,11 +581,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('home_tel', e.target.value)}
                   placeholder="مثال: 035555555"
-                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-mono font-medium transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
+                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-mono font-medium transition-all outline-none ${getFieldClass(
+                    'home_tel',
+                    'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  )}`}
                 />
               </div>
             </div>
@@ -574,11 +604,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('specialty', e.target.value)}
                   placeholder="مثال: استشاري باطنة وكبد"
-                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-medium transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
+                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-medium transition-all outline-none ${getFieldClass(
+                    'specialty',
+                    'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  )}`}
                 />
               </div>
 
@@ -595,11 +624,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                   readOnly={isReadOnlyMode}
                   onChange={(e) => handleFieldChange('address', e.target.value)}
                   placeholder="مثال: شارع سعد زغلول - برج الأطباء"
-                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-medium transition-all outline-none ${
-                    isReadOnlyMode
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed select-text'
-                      : 'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
+                  className={`w-full p-2.5 px-3.5 border rounded-xl text-sm font-medium transition-all outline-none ${getFieldClass(
+                    'address',
+                    'bg-slate-50 hover:bg-slate-100/70 focus:bg-white border-slate-200 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  )}`}
                 />
               </div>
             </div>

@@ -93,7 +93,8 @@ body {
 
 /* الألوان الدلالية العصرية على الشاشة (مع الحفاظ على الألوان الأصلية في الطباعة) */
 .modified {
-  background-color: #fef9c3 !important; /* أصفر عنبري ناعم ومريح للعين */
+  background-color: #ffeb3b !important; /* اللون الأصفر الصريح للتعديلات اليدوية مطابق للأصل */
+  color: #000000 !important;
   box-shadow: inset 0 0 0 1px #facc15;
 }
 

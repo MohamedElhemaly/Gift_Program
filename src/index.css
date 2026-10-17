@@ -113,6 +113,25 @@ body {
   border-color: #ef9a9a !important;
 }
 
+/* تأثير الوميض والتمييز العصري عند الانتقال المباشر لبطاقة الطبيب بالكود */
+@keyframes doctorJumpGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.7), 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+    transform: scale(1.02);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 1), 0 16px 32px -4px rgba(59, 130, 246, 0.6);
+    transform: scale(1.03);
+  }
+}
+
+.jump-highlight {
+  animation: doctorJumpGlow 0.8s ease-in-out infinite alternate !important;
+  z-index: 30 !important;
+  border-color: #3b82f6 !important;
+  position: relative !important;
+}
+
 /* شريط التمرير المخصص لكل بطاقة طبيب (Scrollbar داخل الصندوق) */
 .custom-card-scroll {
   overflow-y: auto !important;

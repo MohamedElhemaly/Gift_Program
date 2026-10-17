@@ -3,7 +3,7 @@ import DoctorCard from './DoctorCard';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import { MapPin, Building2, Navigation, FileText, UserPlus, Trash2 } from 'lucide-react';
 
-function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
+function A4Page({ pageDocs, pageNum, startIndex, isVisible = true, highlightedIndex = null }) {
   const { updatePageHeader, openAddDoctorModal, deletePage, distributionMode } = useDoctorStore();
 
   const firstDoc = pageDocs[0] || {};
@@ -148,6 +148,7 @@ function A4Page({ pageDocs, pageNum, startIndex, isVisible = true }) {
             key={`${doc.id || doc.doc_code || 'blank'}-${startIndex + j}`}
             doc={doc}
             index={startIndex + j}
+            isHighlighted={highlightedIndex === startIndex + j}
           />
         ))}
       </div>

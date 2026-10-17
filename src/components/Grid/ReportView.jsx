@@ -12,11 +12,15 @@ import {
   UserPlus,
   Printer,
   X,
+  Target,
+  Hash,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function ReportView({ selectedPages = null }) {
   const {
     displayedDoctors,
+    rawDoctors,
     openAddDoctorModal,
     autoSaveState,
     filters,
@@ -24,10 +28,12 @@ export default function ReportView({ selectedPages = null }) {
     openPrintModal,
   } = useDoctorStore();
 
-  // Screen Pagination State
+  // Screen Pagination & Jump State
   const [currentPage, setCurrentPage] = useState(1);
   const [pagesPerPage, setPagesPerPage] = useState(10);
   const [jumpInput, setJumpInput] = useState('');
+  const [jumpDocCodeInput, setJumpDocCodeInput] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(null);
 
   const totalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 
@@ -94,8 +100,102 @@ export default function ReportView({ selectedPages = null }) {
         if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     } else {
-      alert(`الصفحة ${target} غير صالحة. النطاق المتاح: من 1 إلى ${totalPages}`);
+      toast.error(`رقم الصفحة غير صالح. النطاق المتاح: من 1 إلى ${totalPages}`);
     }
+  };
+
+  const handleJumpByDocCode = (e) => {
+    e.preventDefault();
+    const rawInput = (jumpDocCodeInput || '').trim();
+    if (!rawInput) {
+      toast.error('يرجى إدخال كود الطبيب للانتقال إليه');
+      return;
+    }
+
+    // Normalize input (supporting Arabic numerals as well as English)
+    const normInput = rawInput
+      .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+      .toLowerCase();
+
+    // 1. Search the currently filtered dataset
+    const doctorIndex = (displayedDoctors || []).findIndex((d) => {
+      if (!d.doc_code) return false;
+      const c = String(d.doc_code)
+        .replace(/[٠-٩]/g, (x) => '٠١٢٣٤٥٦٧٨٩'.indexOf(x))
+        .trim()
+        .toLowerCase();
+      return c === normInput;
+    });
+
+    if (doctorIndex === -1) {
+      // 2. Check if doctor exists in raw database (e.g., hidden by active filters)
+      const existsInRaw = (rawDoctors || []).some((d) => {
+        if (!d.doc_code) return false;
+        const c = String(d.doc_code)
+          .replace(/[٠-٩]/g, (x) => '٠١٢٣٤٥٦٧٨٩'.indexOf(x))
+          .trim()
+          .toLowerCase();
+        return c === normInput;
+      });
+
+      if (existsInRaw) {
+        toast.error(`الطبيب بكود "${rawInput}" موجود ولكن مستبعد بالفلاتر الحالية`, {
+          icon: '🔍',
+          duration: 4000,
+        });
+      } else {
+        toast.error(`لم يتم العثور على طبيب بالكود: "${rawInput}"`);
+      }
+      return;
+    }
+
+    // Doctor found!
+    const foundDoc = displayedDoctors[doctorIndex];
+    const targetPage = Math.floor(doctorIndex / 21) + 1;
+
+    // A. Switch batch if pagination is active
+    if (pagesPerPage !== 'ALL') {
+      const targetBatch = Math.floor((targetPage - 1) / pagesPerPage) + 1;
+      if (safeCurrentPage !== targetBatch) {
+        setCurrentPage(targetBatch);
+      }
+    }
+
+    // B. Set React highlight state
+    setHighlightedIndex(doctorIndex);
+
+    // C. User feedback toast
+    const docNameLabel = foundDoc.name ? ` (${foundDoc.name})` : '';
+    toast.success(`تم الانتقال للطبيب${docNameLabel} في صفحة ${targetPage}`, {
+      icon: '🎯',
+      duration: 3500,
+    });
+
+    // D. Clear input
+    setJumpDocCodeInput('');
+
+    // E. Smooth scroll & trigger highlight animation with DOM retry
+    const attemptScrollAndHighlight = (retryCount = 0) => {
+      const cardEl = document.getElementById(`item-${doctorIndex}`);
+      if (cardEl) {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        cardEl.classList.add('jump-highlight');
+        setTimeout(() => {
+          cardEl.classList.remove('jump-highlight');
+          setHighlightedIndex(null);
+        }, 3000);
+      } else if (retryCount < 5) {
+        setTimeout(() => attemptScrollAndHighlight(retryCount + 1), 100);
+      } else {
+        const pageEl = document.getElementById(`page-${targetPage}`);
+        if (pageEl) {
+          pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        setTimeout(() => setHighlightedIndex(null), 3000);
+      }
+    };
+
+    setTimeout(() => attemptScrollAndHighlight(0), 100);
   };
 
   return (
@@ -259,24 +359,55 @@ export default function ReportView({ selectedPages = null }) {
               </div>
             )}
 
-            {/* Jump to specific page */}
-            <form onSubmit={handleJump} className="flex items-center gap-1">
-              <input
-                type="number"
-                min={1}
-                max={totalPages}
-                placeholder="رقم..."
-                value={jumpInput}
-                onChange={(e) => setJumpInput(e.target.value)}
-                className="w-16 text-center border border-slate-200 rounded-lg px-1.5 py-1 text-xs font-bold focus:border-blue-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded-lg text-xs transition-colors"
-              >
-                انتقال
-              </button>
-            </form>
+            {/* Jump Section: Jump to Page & Jump to Doctor by Code */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 1. Jump to specific page */}
+              <form onSubmit={handleJump} className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  placeholder="صفحة..."
+                  value={jumpInput}
+                  onChange={(e) => setJumpInput(e.target.value)}
+                  className="w-16 text-center border border-slate-200 rounded-lg px-1.5 py-1 text-xs font-bold focus:border-blue-500 focus:outline-none"
+                  title="الانتقال لرقم الصفحة"
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded-lg text-xs transition-colors cursor-pointer"
+                  title="انتقال للصفحة"
+                >
+                  انتقال
+                </button>
+              </form>
+
+              <div className="h-5 w-px bg-slate-200 mx-0.5 hidden sm:block"></div>
+
+              {/* 2. Jump to Doctor by Code (البحث والانتقال بكود الطبيب) */}
+              <form onSubmit={handleJumpByDocCode} className="flex items-center gap-1">
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    placeholder="كود الطبيب..."
+                    value={jumpDocCodeInput}
+                    onChange={(e) => setJumpDocCodeInput(e.target.value)}
+                    className="w-24 sm:w-28 pr-7 pl-2 py-1 text-xs font-bold border border-slate-200 rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none text-right transition-all"
+                    dir="rtl"
+                    title="أدخل كود الطبيب للانتقال المباشر وتحديد بطاقته"
+                  />
+                  <Hash className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
+                </div>
+                <button
+                  type="submit"
+                  className="flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white font-bold px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer"
+                  title="انتقال وتحديد بطاقة الطبيب بالكود"
+                >
+                  <Target className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="hidden sm:inline">انتقال</span>
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -284,7 +415,7 @@ export default function ReportView({ selectedPages = null }) {
       {/* Rendered A4 Pages */}
       {visiblePages.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-300 rounded-xl p-12 text-center text-gray-500">
-          لم يتم العثور على صفحات مطابقة لكلمة البحث "{filterQuery}".
+          لم يتم العثور على أطباء مطابقين لشروط الفلترة المحددة.
         </div>
       ) : (
         visiblePages.map((p) => (
@@ -294,6 +425,7 @@ export default function ReportView({ selectedPages = null }) {
             pageNum={p.pageNum}
             startIndex={p.startIndex}
             isVisible={true}
+            highlightedIndex={highlightedIndex}
           />
         ))
       )}

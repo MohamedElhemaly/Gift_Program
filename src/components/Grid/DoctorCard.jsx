@@ -21,7 +21,7 @@ import {
   Stethoscope,
 } from 'lucide-react';
 
-function DoctorCard({ doc, index }) {
+function DoctorCard({ doc, index, isHighlighted = false }) {
   const {
     updateInlineItem,
     openMoveModal,
@@ -103,12 +103,14 @@ function DoctorCard({ doc, index }) {
 
   return (
     <div
-      className={`grid-item relative transition-all duration-200 p-3 rounded-xl border
+      className={`grid-item relative transition-all duration-300 p-3 rounded-xl border
         ${hideEmptyOnScreen ? 'hidden print:flex' : ''}
         ${cardThemeClass}
+        ${isHighlighted ? 'jump-highlight ring-4 ring-blue-500 scale-[1.02] shadow-xl z-30' : ''}
         print:bg-white print:rounded-none print:shadow-none print:border-b-2 print:border-l-2 print:border-black print:border-solid print:p-[6px]
         ${movedClass} ${inactiveClass}`}
       id={`item-${index}`}
+      data-doc-code={doc.doc_code || ''}
     >
       {/* =========================================================================
           1. MODERN SCREEN VIEW

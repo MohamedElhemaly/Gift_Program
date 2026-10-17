@@ -258,192 +258,187 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
         )}
 
         {/* =========================================================================
-            1. HEADER SECTION & 2. ACTION TOOLBAR
+            1. TOP UTILITY BAR (Serial, Code, Status Badges & Close Button)
             ========================================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200">
-          {/* Doctor Title and Badges */}
-          <div className="space-y-2 flex-1 min-w-0">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-800 font-black flex items-center justify-center text-sm flex-shrink-0 shadow-2xs">
-                #{doc.counter || (index % 21) + 1}
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-3">
+          {/* Right Side: Serial, Protected Code & Status Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Serial Counter Badge */}
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-100 text-blue-900 font-black text-xs shadow-2xs">
+              <span className="text-blue-500 font-normal text-[10px]">مسلسل:</span>
+              <span>#{doc.counter || (index % 21) + 1}</span>
+            </div>
+
+            {/* Doctor Code Badge */}
+            <div
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs select-none"
+              title="كود الطبيب (معرّف أساسي محمي)"
+            >
+              <Hash className="w-3.5 h-3.5 text-blue-600" />
+              <span>كود: {cleanGeneralText(doc.doc_code) || 'غير محدد'}</span>
+              <span className="text-[10px] bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-sans font-normal flex items-center gap-0.5">
+                <ShieldCheck className="w-2.5 h-2.5" />
+                محمي
               </span>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                {cleanDoctorName(doc.name) || doc.name || 'طبيب بدون اسم (خانة شاغرة)'}
-              </h2>
             </div>
 
-            {/* Badges: Code, Location, Status, Modifications */}
-            <div className="flex items-center gap-2 flex-wrap pt-0.5">
-              {/* Doctor Code Badge */}
-              <div
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs"
-                title="كود الطبيب (معرّف أساسي محمي)"
-              >
-                <Hash className="w-3 h-3 text-blue-500" />
-                <span>كود: {cleanGeneralText(doc.doc_code) || 'غير محدد'}</span>
-                <span className="text-[10px] bg-blue-200/70 text-blue-900 px-1 py-0.2 rounded font-sans font-normal flex items-center gap-0.5">
-                  <ShieldCheck className="w-2.5 h-2.5" />
-                  محمي
-                </span>
-              </div>
-
-              {/* Location Badge */}
-              <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200"
-                title="الموقع الحالي للصفحة"
-              >
-                <MapPinned className="w-3.5 h-3.5 text-slate-500" />
-                <span className="truncate max-w-[280px]">{locationLabel}</span>
-              </div>
-
-              {/* Status Badges */}
-              {doc.is_inactive && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                  <UserX className="w-3 h-3 text-rose-600" />
-                  <span>موقوف مؤقتاً</span>
-                </span>
-              )}
-
-              {doc.is_moved && (
-                <span
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs italic"
-                  title={`منقول من: ${cleanGeneralText(doc.moved_from) || 'موقع سابق'}`}
-                >
-                  <ArrowRightLeft className="w-3 h-3 text-amber-700 not-italic" />
-                  <span>
-                    كان في: <span className="not-italic font-semibold">{cleanGeneralText(doc.moved_from) || 'موقع سابق'}</span>
-                  </span>
-                </span>
-              )}
-
-              {doc.merged_codes && doc.merged_codes.length > 0 && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300 shadow-2xs">
-                  <GitMerge className="w-3 h-3 text-purple-600" />
-                  <span>+ مدمج مع: {doc.merged_codes.join(', ')}</span>
-                </span>
-              )}
-
-              {/* Universal Modification Indicator Badge */}
-              {isManuallyModified && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-[#ffeb3b] text-black border border-yellow-400 shadow-2xs">
-                  <span>✏️ معدل يدوياً</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-2 flex-shrink-0 self-start">
-            {!isReadOnlyMode ? (
-              <div className="inline-flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs">
-                {/* Move Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    openMoveModal(index);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-700 hover:bg-white hover:shadow-2xs transition-all cursor-pointer"
-                  title="نقل الطبيب لموقع آخر"
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" />
-                  <span>نقل</span>
-                </button>
-
-                <div className="w-[1px] h-4 bg-slate-300 mx-0.5" />
-
-                {/* Combine / Merge Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    openCombineModal(index);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-purple-700 hover:bg-white hover:shadow-2xs transition-all cursor-pointer"
-                  title="دمج طبيب آخر مع هذا الطبيب"
-                >
-                  <GitMerge className="w-3.5 h-3.5 text-purple-600" />
-                  <span>دمج</span>
-                </button>
-
-                <div className="w-[1px] h-4 bg-slate-300 mx-0.5" />
-
-                {/* Toggle Inactive Button */}
-                <button
-                  type="button"
-                  onClick={handleToggleInactive}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    doc.is_inactive
-                      ? 'text-emerald-700 hover:bg-white hover:shadow-2xs'
-                      : 'text-amber-700 hover:bg-white hover:shadow-2xs'
-                  }`}
-                  title={doc.is_inactive ? 'إعادة تفعيل الطبيب' : 'إيقاف مؤقت (إخفاء في الطباعة)'}
-                >
-                  {doc.is_inactive ? (
-                    <>
-                      <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>تفعيل</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserX className="w-3.5 h-3.5 text-amber-600" />
-                      <span>إيقاف</span>
-                    </>
-                  )}
-                </button>
-
-                <div className="w-[1px] h-4 bg-slate-300 mx-0.5" />
-
-                {/* Clear / Delete Slot Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    clearDoctorSlot(index);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:bg-white hover:shadow-2xs transition-all cursor-pointer"
-                  title="تفريغ بيانات هذه الخانة"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                  <span>تفريغ</span>
-                </button>
-              </div>
-            ) : (
-              <div className="inline-flex items-center gap-2">
-                {/* UNLOCKED MOVE BUTTON IN READ-ONLY MODE */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    openMoveModal(index);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-sm hover:shadow transition-all cursor-pointer"
-                  title="نقل الطبيب لوجهة أخرى (متاح دائماً حتى أثناء البحث)"
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                  <span>نقل</span>
-                </button>
-
-                <div
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs select-none"
-                  title="الحقول الأخرى للقراءة فقط أثناء تفعيل الفلاتر أو البحث"
-                >
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
-                  <span>قراءة فقط</span>
-                </div>
-              </div>
+            {/* Status Badges */}
+            {doc.is_inactive && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+                <UserX className="w-3 h-3 text-rose-600" />
+                <span>موقوف مؤقتاً</span>
+              </span>
             )}
 
-            {/* Quick Close Button */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-              title="إغلاق النافذة"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {doc.is_moved && (
+              <span
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs italic"
+                title={`منقول من: ${cleanGeneralText(doc.moved_from) || 'موقع سابق'}`}
+              >
+                <ArrowRightLeft className="w-3 h-3 text-amber-700 not-italic" />
+                <span>
+                  كان في: <span className="not-italic font-semibold">{cleanGeneralText(doc.moved_from) || 'موقع سابق'}</span>
+                </span>
+              </span>
+            )}
+
+            {doc.merged_codes && doc.merged_codes.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300 shadow-2xs">
+                <GitMerge className="w-3 h-3 text-purple-600" />
+                <span>+ مدمج مع: {doc.merged_codes.join(', ')}</span>
+              </span>
+            )}
+
+            {/* Universal Modification Indicator Badge */}
+            {isManuallyModified && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-[#ffeb3b] text-black border border-yellow-400 shadow-2xs">
+                <span>✏️ معدل يدوياً</span>
+              </span>
+            )}
           </div>
+
+          {/* Left Side: Modern Quick Close Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer flex-shrink-0"
+            title="إغلاق النافذة (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* =========================================================================
+            2. DOCTOR NAME SECTION (Dedicated Full-Width Row - Never Overlapped)
+            ========================================================================= */}
+        <div className="pt-3 pb-3">
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-snug break-words">
+            {cleanDoctorName(doc.name) || doc.name || 'طبيب بدون اسم (خانة شاغرة)'}
+          </h2>
+
+          {/* Location Breadcrumb directly under the name */}
+          <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 font-medium">
+            <MapPinned className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span>الموقع الحالي:</span>
+            <span className="font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+              {locationLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            3. ACTION TOOLBAR (Dedicated Full-Width Strip)
+            ========================================================================= */}
+        <div className="pb-4 border-b border-slate-200">
+          {!isReadOnlyMode ? (
+            <div className="p-1.5 bg-slate-50 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-1.5 flex-wrap">
+              {/* Move Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openMoveModal(index);
+                }}
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200/80 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                title="نقل الطبيب لموقع آخر"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" />
+                <span>نقل الطبيب</span>
+              </button>
+
+              {/* Combine Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openCombineModal(index);
+                }}
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-purple-700 bg-white hover:bg-purple-50 border border-purple-200/80 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                title="دمج طبيب آخر مع هذا الطبيب"
+              >
+                <GitMerge className="w-3.5 h-3.5 text-purple-600" />
+                <span>دمج طبيب</span>
+              </button>
+
+              {/* Toggle Inactive Button */}
+              <button
+                type="button"
+                onClick={handleToggleInactive}
+                className={`flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border shadow-2xs hover:shadow-xs transition-all cursor-pointer ${
+                  doc.is_inactive
+                    ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-300'
+                    : 'text-amber-700 bg-white hover:bg-amber-50 border-amber-200/80'
+                }`}
+                title={doc.is_inactive ? 'إعادة تفعيل الطبيب' : 'إيقاف مؤقت (إخفاء في الطباعة)'}
+              >
+                {doc.is_inactive ? (
+                  <>
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>تفعيل الطبيب</span>
+                  </>
+                ) : (
+                  <>
+                    <UserX className="w-3.5 h-3.5 text-amber-600" />
+                    <span>إيقاف مؤقت</span>
+                  </>
+                )}
+              </button>
+
+              {/* Clear Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  clearDoctorSlot(index);
+                }}
+                className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 bg-white hover:bg-rose-50 border border-rose-200/80 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+                title="تفريغ بيانات هذه الخانة"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <span>تفريغ الخانة</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 p-2 bg-amber-50/80 border border-amber-200 rounded-2xl flex-wrap">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openMoveModal(index);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
+                title="نقل الطبيب لوجهة أخرى (متاح دائماً حتى أثناء البحث)"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                <span>نقل الطبيب لوجهة أخرى</span>
+              </button>
+
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold">
+                <Lock className="w-3.5 h-3.5 text-amber-700" />
+                <span>وضع القراءة فقط (تعديل الحقول مقفل أثناء البحث)</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* =========================================================================

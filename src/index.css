@@ -49,11 +49,8 @@ body {
 
 .modal-content {
   background: white;
-  padding: 25px;
-  border-radius: 8px;
-  width: 450px;
   max-width: 95%;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
 /* تنسيقات التعديل اليدوي المباشر */

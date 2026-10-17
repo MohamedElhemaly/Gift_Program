@@ -1,4 +1,11 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxButton,
+  ComboboxOptions,
+  ComboboxOption,
+} from '@headlessui/react';
 import { useDoctorStore, normalizeArabicText } from '../../store/useDoctorStore';
 import { useMoveDoctorMutation } from '../../hooks/useDoctorQueries';
 import { cleanDoctorName, cleanGeneralText } from '../../services/doctorService';
@@ -14,7 +21,6 @@ import {
   Search,
   Check,
   ChevronsUpDown,
-  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -31,26 +37,18 @@ export default function MoveModal() {
 
   const moveDoctorMutation = useMoveDoctorMutation();
 
-  const [selectedDest, setSelectedDest] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [comboboxOpen, setComboboxOpen] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [query, setQuery] = useState('');
 
   const [newGvr, setNewGvr] = useState('');
   const [newCity, setNewCity] = useState('');
   const [newRegion, setNewRegion] = useState('');
 
-  const comboboxRef = useRef(null);
-  const searchInputRef = useRef(null);
-  const listRef = useRef(null);
-
   // Reset modal state on open or when active doctor changes
   useEffect(() => {
     if (isMoveModalOpen) {
-      setSelectedDest('');
-      setSearchTerm('');
-      setComboboxOpen(false);
-      setHighlightedIndex(0);
+      setSelectedLocation(null);
+      setQuery('');
       setNewGvr('');
       setNewCity('');
       setNewRegion('');
@@ -62,28 +60,12 @@ export default function MoveModal() {
     if (!isMoveModalOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (comboboxOpen) {
-          setComboboxOpen(false);
-        } else {
-          closeMoveModal();
-        }
+        closeMoveModal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMoveModalOpen, comboboxOpen, closeMoveModal]);
-
-  // Click outside to close combobox dropdown
-  useEffect(() => {
-    if (!comboboxOpen) return;
-    function handleClickOutside(e) {
-      if (comboboxRef.current && !comboboxRef.current.contains(e.target)) {
-        setComboboxOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [comboboxOpen]);
+  }, [isMoveModalOpen, closeMoveModal]);
 
   // Extract ALL unique locations from rawDoctors, locations table, and displayedDoctors
   const locationList = useMemo(() => {
@@ -135,50 +117,30 @@ export default function MoveModal() {
         city: c || '',
         region: r || '',
         label: parts.join(' - ') || 'بدون تحديد',
+        isNew: false,
       };
     });
   }, [rawDoctors, locations, displayedDoctors]);
 
-  const selectedLocationObj = useMemo(
-    () => locationList.find((l) => l.value === selectedDest),
-    [locationList, selectedDest]
-  );
-  const isNewSelected = selectedDest === 'NEW';
-
   // Filtered locations with instant Arabic normalization
   const filteredLocations = useMemo(() => {
-    const trimmed = searchTerm.trim();
+    const trimmed = query.trim();
     if (!trimmed) return locationList;
 
-    // If searchTerm is the current selected location label, show full list
-    if (selectedLocationObj && trimmed === selectedLocationObj.label) {
-      return locationList;
-    }
-
-    const query = normalizeArabicText(trimmed);
+    const normQuery = normalizeArabicText(trimmed);
     return locationList.filter((loc) => {
       const normLabel = normalizeArabicText(loc.label);
       const normGvr = normalizeArabicText(loc.gvr);
       const normCity = normalizeArabicText(loc.city);
       const normReg = normalizeArabicText(loc.region);
       return (
-        normLabel.includes(query) ||
-        normGvr.includes(query) ||
-        normCity.includes(query) ||
-        normReg.includes(query)
+        normLabel.includes(normQuery) ||
+        normGvr.includes(normQuery) ||
+        normCity.includes(normQuery) ||
+        normReg.includes(normQuery)
       );
     });
-  }, [locationList, searchTerm, selectedLocationObj]);
-
-  // Keep highlighted option scrolled into view during arrow keys
-  useEffect(() => {
-    if (comboboxOpen && listRef.current) {
-      const activeEl = listRef.current.children[highlightedIndex];
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [highlightedIndex, comboboxOpen]);
+  }, [locationList, query]);
 
   if (!isMoveModalOpen || activeModalIndex === -1) return null;
 
@@ -190,71 +152,24 @@ export default function MoveModal() {
     .filter(Boolean);
   const currentLocLabel = currentLocParts.length > 0 ? currentLocParts.join(' - ') : 'بدون موقع محدد';
 
-  const handleSelectLocation = (loc) => {
-    setSelectedDest(loc.value);
-    setSearchTerm(loc.label);
-    setComboboxOpen(false);
-  };
-
-  const handleSelectNew = (presetRegion = '') => {
-    setSelectedDest('NEW');
-    setSearchTerm('➕ وجهة جديدة غير مسجلة');
-    if (presetRegion && presetRegion !== '➕ وجهة جديدة غير مسجلة') {
-      setNewRegion(presetRegion);
-    }
-    setComboboxOpen(false);
-  };
+  const isNewSelected = selectedLocation?.isNew || selectedLocation?.value === 'NEW';
 
   const handleClear = () => {
-    setSelectedDest('');
-    setSearchTerm('');
+    setSelectedLocation(null);
+    setQuery('');
     setNewGvr('');
     setNewCity('');
     setNewRegion('');
-    setComboboxOpen(true);
-    searchInputRef.current?.focus();
-  };
-
-  const handleInputKeyDown = (e) => {
-    if (!comboboxOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        setComboboxOpen(true);
-        return;
-      }
-    }
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex((prev) =>
-        prev < filteredLocations.length - 1 ? prev + 1 : 0
-      );
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex((prev) =>
-        prev > 0 ? prev - 1 : Math.max(0, filteredLocations.length - 1)
-      );
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (filteredLocations.length > 0) {
-        const target = filteredLocations[highlightedIndex] || filteredLocations[0];
-        handleSelectLocation(target);
-      } else if (searchTerm.trim()) {
-        handleSelectNew(searchTerm.trim());
-      }
-    } else if (e.key === 'Escape') {
-      setComboboxOpen(false);
-    }
   };
 
   const handleConfirm = () => {
-    if (!selectedDest) {
+    if (!selectedLocation) {
       toast.error('يرجى اختيار الوجهة الجديدة!');
       return;
     }
 
     let g = '', c = '', r = '';
-    if (selectedDest === 'NEW') {
+    if (isNewSelected) {
       g = newGvr.trim();
       c = newCity.trim();
       r = newRegion.trim();
@@ -263,7 +178,7 @@ export default function MoveModal() {
         return;
       }
     } else {
-      const parts = selectedDest.split('::');
+      const parts = (selectedLocation.value || '').split('::');
       g = parts[0] || '';
       c = parts[1] || '';
       r = parts[2] || '';
@@ -284,7 +199,7 @@ export default function MoveModal() {
   };
 
   const isConfirmDisabled =
-    !selectedDest ||
+    !selectedLocation ||
     (isNewSelected && !newGvr.trim() && !newCity.trim() && !newRegion.trim());
 
   return (
@@ -348,9 +263,9 @@ export default function MoveModal() {
         </div>
 
         {/* =========================================================================
-            INTERACTIVE SEARCHABLE COMBOBOX (Direct Typing + Instant Filtering)
+            HEADLESS UI COMBOBOX (Native Focus Trapping, No Blur Conflict, Smooth RTL)
             ========================================================================= */}
-        <div className="space-y-2 mb-4 relative" ref={comboboxRef}>
+        <div className="space-y-2 mb-4 relative">
           <div className="flex items-center justify-between">
             <label className="block text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-blue-600" />
@@ -361,163 +276,149 @@ export default function MoveModal() {
             </span>
           </div>
 
-          {/* Real Input Element */}
-          <div className="relative">
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchTerm}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSearchTerm(val);
-                if (!comboboxOpen) setComboboxOpen(true);
-                setHighlightedIndex(0);
-                if (selectedDest && val !== selectedLocationObj?.label) {
-                  setSelectedDest('');
-                }
-              }}
-              onFocus={(e) => {
-                setComboboxOpen(true);
-                if (selectedDest) {
-                  e.target.select();
-                }
-              }}
-              onKeyDown={handleInputKeyDown}
-              placeholder="ابحث بالاسم أو اختر الوجهة... (مثال: سموحة، دمنهور)"
-              className={`w-full pr-10 pl-16 py-3 bg-white border ${
-                selectedDest && !isNewSelected
-                  ? 'border-blue-500 ring-2 ring-blue-500/15 font-bold text-blue-950 bg-blue-50/20'
-                  : isNewSelected
-                  ? 'border-indigo-500 ring-2 ring-indigo-500/15 font-bold text-indigo-950 bg-indigo-50/20'
-                  : 'border-slate-300 hover:border-blue-400 focus:border-blue-500 text-slate-800'
-              } rounded-2xl text-xs sm:text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-2xs`}
-              dir="rtl"
-              autoComplete="off"
-            />
+          <Combobox
+            value={selectedLocation}
+            onChange={(val) => {
+              setSelectedLocation(val);
+              if (val?.isNew && val.presetRegion) {
+                setNewRegion(val.presetRegion);
+              }
+            }}
+            onClose={() => setQuery('')}
+            immediate
+          >
+            <div className="relative">
+              <ComboboxInput
+                className={`w-full pr-10 pl-16 py-3 bg-white border ${
+                  selectedLocation && !isNewSelected
+                    ? 'border-blue-500 ring-2 ring-blue-500/15 font-bold text-blue-950 bg-blue-50/20'
+                    : isNewSelected
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/15 font-bold text-indigo-950 bg-indigo-50/20'
+                    : 'border-slate-300 hover:border-blue-400 focus:border-blue-500 text-slate-800'
+                } rounded-2xl text-xs sm:text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-2xs`}
+                displayValue={(loc) => loc?.label || ''}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="ابحث بالاسم أو اختر الوجهة... (مثال: سموحة، دمنهور)"
+                dir="rtl"
+                autoComplete="off"
+              />
 
-            {/* Right Icon (MapPin or Search in RTL) */}
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              {selectedDest ? (
-                <MapPin className="w-4 h-4 text-blue-600" />
-              ) : (
-                <Search className="w-4 h-4 text-slate-400" />
-              )}
-            </div>
+              {/* Leading Icon (Right in RTL) */}
+              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                {selectedLocation ? (
+                  <MapPin className="w-4 h-4 text-blue-600" />
+                ) : (
+                  <Search className="w-4 h-4 text-slate-400" />
+                )}
+              </div>
 
-            {/* Left Action Buttons (Clear & Chevron) */}
-            <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {(searchTerm || selectedDest) && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                  title="مسح التحديد والبحث"
+              {/* Trailing Action Buttons (Left in RTL) */}
+              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+                {(query || selectedLocation) && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClear();
+                    }}
+                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="مسح التحديد والبحث"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <ComboboxButton
+                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  title="عرض خيارات الوجهات"
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setComboboxOpen((prev) => !prev);
-                  if (!comboboxOpen) {
-                    searchInputRef.current?.focus();
-                  }
-                }}
-                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                title={comboboxOpen ? 'إغلاق القائمة' : 'عرض الخيارات'}
-              >
-                <ChevronsUpDown className="w-4 h-4" />
-              </button>
+                  <ChevronsUpDown className="w-4 h-4" />
+                </ComboboxButton>
+              </div>
             </div>
-          </div>
 
-          {/* Floating Searchable Dropdown */}
-          {comboboxOpen && (
-            <div
-              className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-fadeIn"
-              style={{ maxHeight: '300px' }}
+            <ComboboxOptions
+              anchor={{ to: 'bottom start', gap: 6 }}
+              className="w-[var(--input-width)] max-h-64 rounded-2xl bg-white shadow-2xl border border-slate-200 z-[9999] overflow-y-auto divide-y divide-slate-100 p-1 outline-none text-right"
+              dir="rtl"
             >
-              {/* Header Status & Quick Action */}
-              <div className="p-2.5 px-3.5 border-b border-slate-100 bg-slate-50/90 flex items-center justify-between text-[11px] font-semibold text-slate-600">
+              {/* Header Status in Dropdown */}
+              <div className="p-2 px-3 border-b border-slate-100 bg-slate-50/90 flex items-center justify-between text-[11px] font-semibold text-slate-600">
                 <span>
-                  {searchTerm.trim()
+                  {query.trim()
                     ? `نتائج البحث: ${filteredLocations.length} من أصل ${locationList.length}`
                     : `كل الوجهات المسجلة (${locationList.length})`}
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleSelectNew(searchTerm.trim())}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setSelectedLocation({
+                      value: 'NEW',
+                      label: query.trim() ? `➕ وجهة جديدة: "${query.trim()}"` : '➕ وجهة جديدة غير مسجلة',
+                      isNew: true,
+                      presetRegion: query.trim(),
+                    });
+                    if (query.trim()) setNewRegion(query.trim());
+                  }}
                   className="text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer flex items-center gap-1"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>وجهة جديدة غير مسجلة</span>
+                  <PlusCircle className="w-3 h-3" />
+                  <span>وجهة جديدة</span>
                 </button>
               </div>
 
-              {/* Scrollable Results List */}
-              <div
-                ref={listRef}
-                className="overflow-y-auto divide-y divide-slate-100 max-h-56 overscroll-contain"
-              >
-                {/* Option to create new custom destination */}
-                {searchTerm.trim() && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectNew(searchTerm.trim())}
-                    className="w-full flex items-center justify-between p-2.5 px-3.5 bg-blue-50/60 hover:bg-blue-100/70 text-right transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                        <PlusCircle className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-bold text-blue-900 block">
-                          ➕ استخدام "{searchTerm.trim()}" كوجهة جديدة...
-                        </span>
-                        <span className="text-[10px] text-blue-600">كتابة المحافظة والمدينة والحي يدوياً</span>
-                      </div>
+              {/* Dynamic Option for Custom Location if query typed */}
+              {query.trim() && (
+                <ComboboxOption
+                  value={{
+                    value: 'NEW',
+                    label: `➕ وجهة جديدة: "${query.trim()}"`,
+                    isNew: true,
+                    presetRegion: query.trim(),
+                  }}
+                  className="p-2.5 px-3 rounded-xl cursor-pointer data-[focus]:bg-blue-50 transition-colors flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                      <PlusCircle className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[10px] font-bold bg-blue-200/80 text-blue-900 px-2 py-0.5 rounded-full">
-                      يدوي
-                    </span>
-                  </button>
-                )}
+                    <div>
+                      <span className="text-xs font-bold text-blue-900 block">
+                        ➕ استخدام "{query.trim()}" كوجهة جديدة...
+                      </span>
+                      <span className="text-[10px] text-blue-600">كتابة المحافظة والمدينة والحي يدوياً</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                    يدوي
+                  </span>
+                </ComboboxOption>
+              )}
 
-                {/* Filtered Database Locations */}
-                {filteredLocations.length > 0 ? (
-                  filteredLocations.map((loc, idx) => {
-                    const isCurrent = currentLocLabel === loc.label;
-                    const isSelected = selectedDest === loc.value;
-                    const isHighlighted = highlightedIndex === idx;
-
-                    return (
-                      <button
-                        key={loc.value}
-                        type="button"
-                        onClick={() => handleSelectLocation(loc)}
-                        onMouseEnter={() => setHighlightedIndex(idx)}
-                        className={`w-full flex items-center justify-between p-2.5 px-3.5 text-right transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-50 text-blue-950 font-bold'
-                            : isHighlighted
-                            ? 'bg-slate-100 text-slate-900'
-                            : 'hover:bg-slate-50 text-slate-800'
-                        }`}
-                      >
+              {/* Filtered Database Locations */}
+              {filteredLocations.map((loc) => {
+                const isCurrent = currentLocLabel === loc.label;
+                return (
+                  <ComboboxOption
+                    key={loc.value}
+                    value={loc}
+                    className="p-2.5 px-3 rounded-xl cursor-pointer data-[focus]:bg-slate-100 data-[selected]:bg-blue-50 transition-colors flex items-center justify-between group"
+                  >
+                    {({ selected, focus }) => (
+                      <>
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <MapPin
                             className={`w-3.5 h-3.5 flex-shrink-0 ${
-                              isSelected
+                              selected
                                 ? 'text-blue-600'
-                                : isHighlighted
+                                : focus
                                 ? 'text-blue-500'
                                 : 'text-slate-400'
                             }`}
                           />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap text-xs">
-                              <span className="font-extrabold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              <span className="font-extrabold text-slate-900 bg-slate-100 group-data-[focus]:bg-white px-1.5 py-0.5 rounded border border-slate-200">
                                 {loc.gvr}
                               </span>
                               {loc.city && (
@@ -542,36 +443,48 @@ export default function MoveModal() {
                               الموقع الحالي
                             </span>
                           )}
-                          {isSelected && (
+                          {selected && (
                             <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
                               <Check className="w-3 h-3 stroke-[3]" />
                             </div>
                           )}
                         </div>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="p-6 text-center text-slate-500">
-                    <p className="text-xs font-bold text-slate-700 mb-1">
-                      لا توجد مواقع مطابقة للبحث "{searchTerm}"
-                    </p>
-                    <p className="text-[11px] text-slate-400 mb-3">
-                      يمكنك إضافة هذا الموقع كوجهة جديدة يدوياً بنقرة واحدة
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectNew(searchTerm.trim())}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      <span>إضافة "{searchTerm}" كوجهة جديدة</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+                      </>
+                    )}
+                  </ComboboxOption>
+                );
+              })}
+
+              {/* Empty Search Fallback */}
+              {filteredLocations.length === 0 && (
+                <div className="p-5 text-center text-slate-500">
+                  <p className="text-xs font-bold text-slate-700 mb-1">
+                    لا توجد مواقع مطابقة للبحث "{query}"
+                  </p>
+                  <p className="text-[11px] text-slate-400 mb-3">
+                    يمكنك تسجيل هذا الموقع كوجهة جديدة وتحديد بياناته
+                  </p>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setSelectedLocation({
+                        value: 'NEW',
+                        label: `➕ وجهة جديدة: "${query.trim()}"`,
+                        isNew: true,
+                        presetRegion: query.trim(),
+                      });
+                      setNewRegion(query.trim());
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>إضافة "{query}" كوجهة جديدة</span>
+                  </button>
+                </div>
+              )}
+            </ComboboxOptions>
+          </Combobox>
         </div>
 
         {/* Custom New Location Input Fields */}
@@ -627,7 +540,7 @@ export default function MoveModal() {
         )}
 
         {/* Transfer Route Preview */}
-        {selectedDest && (
+        {selectedLocation && (
           <div className="mb-4 p-3 bg-gradient-to-r from-slate-50 via-blue-50/50 to-indigo-50/50 border border-blue-200 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs animate-fadeIn">
             <div className="flex-1 min-w-0">
               <span className="text-[10px] font-bold text-slate-400 block mb-0.5">من الموقع الحالي:</span>
@@ -641,7 +554,7 @@ export default function MoveModal() {
               <span className="font-extrabold text-blue-900 truncate block text-right">
                 {isNewSelected
                   ? [newGvr, newCity, newRegion].filter(Boolean).join(' - ') || 'وجهة جديدة مخصصة'
-                  : selectedLocationObj?.label || 'الوجهة المحددة'}
+                  : selectedLocation.label}
               </span>
             </div>
           </div>

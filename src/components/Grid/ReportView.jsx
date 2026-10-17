@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import A4Page from './A4Page';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import {

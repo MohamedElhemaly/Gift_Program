@@ -83,28 +83,47 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
     }
   };
 
-  const getModClass = (field) => {
-    if (doc[field + '_updated']) return 'updated-stats';
-    if (doc[field + '_modified']) return 'modified';
-    return '';
-  };
-
   const isInactive = Boolean(doc.is_inactive);
   const isMoved = Boolean(doc.is_moved);
   const hasData = Boolean(doc.doc_code || doc.name);
+
+  // Check if doctor has ANY manual modifications (Universal Yellow Highlight)
+  const isManuallyModified = Boolean(
+    isMoved ||
+    doc.is_modified ||
+    doc.name_modified ||
+    doc.specialty_modified ||
+    doc.address_modified ||
+    doc.mobile_modified ||
+    doc.home_tel_modified ||
+    doc.old_stats_modified ||
+    doc.new_stats_modified ||
+    doc.counter_modified ||
+    doc.pageGvr_modified ||
+    doc.pageCity_modified ||
+    doc.pageRegion_modified ||
+    (doc.merged_codes && doc.merged_codes.length > 0)
+  );
+
+  const getModClass = (field) => {
+    if (doc[field + '_modified']) return 'modified bg-yellow-200/90 text-yellow-950 font-bold px-1 rounded border border-yellow-400/80 shadow-2xs print:bg-transparent print:border-0 print:text-black print:shadow-none';
+    if (doc[field + '_updated']) return 'updated-stats bg-emerald-100 text-emerald-950 px-1 rounded border border-emerald-300 print:bg-transparent print:border-0 print:text-black';
+    return '';
+  };
+
   const movedClass = isMoved ? 'moved-highlight' : '';
   const inactiveClass = isInactive ? 'inactive-doc' : '';
   const hideEmptyOnScreen = !hasData && !showEmptySlotsOnScreen;
 
   // Conditionally apply background theme:
   // 1. Inactive: Light Red (Optimistic UI)
-  // 2. Moved: Distinct Amber (Visual highlight on screen only)
+  // 2. Modified (Moved, Inline Edits, Merged): Universal Yellow Highlight (Screen-only)
   // 3. Normal with Data: Clean White
   // 4. Empty slot: Dashed slate
   const cardThemeClass = isInactive
     ? 'bg-rose-100/90 border-rose-300 hover:border-rose-400 shadow-xs ring-1 ring-rose-200'
-    : isMoved
-    ? 'bg-amber-50/90 border-amber-300 hover:border-amber-400 shadow-xs ring-1 ring-amber-200'
+    : isManuallyModified
+    ? 'bg-yellow-100/90 border-yellow-400/90 hover:border-yellow-500 shadow-xs ring-2 ring-yellow-300/80'
     : hasData
     ? 'bg-white border-slate-200 hover:border-blue-400 shadow-xs hover:shadow-md'
     : 'bg-slate-50/50 border-dashed border-slate-300 hover:bg-white hover:border-blue-300';
@@ -167,7 +186,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                 </div>
               </div>
 
-              {/* Action Buttons Toolbar (Hidden in Read-Only Mode) */}
+              {/* Action Buttons Toolbar */}
               {!isReadOnly ? (
                 <div className="flex items-center gap-0.5 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200">
                   <button
@@ -224,8 +243,20 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                   >
                     <Maximize2 className="w-3.5 h-3.5" />
                   </button>
+
+                  {/* UNLOCKED MOVE BUTTON IN READ-ONLY MODE */}
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer shadow-2xs"
+                    onClick={() => openMoveModal(index)}
+                    title="نقل الطبيب لوجهة أخرى (متاح دائماً حتى أثناء البحث)"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600" />
+                    <span className="text-[10px]">نقل</span>
+                  </button>
+
                   <div
-                    className="flex items-center gap-1 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md text-[10px] font-bold text-amber-800 select-none shadow-2xs"
+                    className="flex items-center gap-1 bg-amber-50 border border-amber-200/90 px-1.5 py-0.5 rounded-md text-[10px] font-bold text-amber-800 select-none shadow-2xs"
                     title="وضع القراءة فقط: مسح الفلاتر والبحث للتمكن من التعديل"
                   >
                     <Lock className="w-3 h-3 text-amber-600" />

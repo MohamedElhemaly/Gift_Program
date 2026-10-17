@@ -473,11 +473,12 @@ body {
     font-size: 11px !important;
   }
 
-  /* الحفاظ على ألوان التمييز عند الطباعة بدقة */
+  /* الحفاظ على نقاء الطباعة باللونين الأبيض والأسود (التمييز الأصفر للشاشة فقط) */
   .modified {
-    background-color: #ffeb3b !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
   }
 
   .moved-highlight {
@@ -490,9 +491,10 @@ body {
   }
 
   .updated-stats {
-    background-color: #d4edda !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
   }
 
   /* إخفاء محتوى الطبيب الموقوف وإبقاء الخلية فارغة تماماً */

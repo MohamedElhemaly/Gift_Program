@@ -211,10 +211,10 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
               </div>
               <div>
                 <span className="font-extrabold text-xs sm:text-sm text-amber-950 block">
-                  التعديل معطل لحماية البيانات أثناء البحث
+                  التعديل معطل لحماية البيانات أثناء البحث (إجراء النقل متاح)
                 </span>
                 <span className="text-[11px] font-medium text-amber-800">
-                  وضع القراءة فقط مفعّل. يرجى مسح الفلاتر والبحث للتمكن من تعديل البيانات.
+                  وضع القراءة فقط مفعّل. يمكنك نقل الطبيب لوجهة جديدة، بينما تظل باقي الحقول محمية حتى مسح الفلاتر.
                 </span>
               </div>
             </div>
@@ -369,12 +369,28 @@ export default function DoctorDetailModal({ isOpen, onClose, index }) {
                 </button>
               </div>
             ) : (
-              <div
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs select-none"
-                title="الإجراءات معطلة أثناء تفعيل الفلاتر أو البحث"
-              >
-                <Lock className="w-3.5 h-3.5 text-amber-600" />
-                <span>الإجراءات معطلة (قراءة فقط)</span>
+              <div className="inline-flex items-center gap-2">
+                {/* UNLOCKED MOVE BUTTON IN READ-ONLY MODE */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    openMoveModal(index);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-sm hover:shadow transition-all cursor-pointer"
+                  title="نقل الطبيب لوجهة أخرى (متاح دائماً حتى أثناء البحث)"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>نقل</span>
+                </button>
+
+                <div
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold shadow-2xs select-none"
+                  title="الحقول الأخرى للقراءة فقط أثناء تفعيل الفلاتر أو البحث"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>قراءة فقط</span>
+                </div>
               </div>
             )}
 

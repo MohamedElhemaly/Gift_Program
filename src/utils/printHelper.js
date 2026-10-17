@@ -187,9 +187,9 @@ function getPrintStyles() {
       }
       .note-moved { color: #d9534f !important; border-color: #d9534f !important; }
       .note-merged { color: #800080 !important; border-color: #800080 !important; }
-      .modified { background-color: #ffeb3b !important; }
+      .modified { background-color: transparent !important; }
       .moved-highlight { background-color: white !important; }
-      .updated-stats { background-color: #d4edda !important; }
+      .updated-stats { background-color: transparent !important; }
       .inactive-doc { background-color: transparent !important; }
       .inactive-doc > * { display: none !important; }
     </style>

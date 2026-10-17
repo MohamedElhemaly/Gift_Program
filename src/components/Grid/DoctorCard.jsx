@@ -215,12 +215,22 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                   </button>
                 </div>
               ) : (
-                <div
-                  className="flex items-center gap-1 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md text-[10px] font-bold text-amber-800 select-none shadow-2xs"
-                  title="وضع القراءة فقط: مسح الفلاتر والبحث للتمكن من التعديل"
-                >
-                  <Lock className="w-3 h-3 text-amber-600" />
-                  <span>قراءة فقط</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="p-1 rounded-md text-slate-600 hover:bg-white hover:text-blue-700 bg-slate-100/90 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+                    onClick={() => openMaximizeModal(index)}
+                    title="تكبير وعرض التفاصيل (وضع القراءة فقط)"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                  <div
+                    className="flex items-center gap-1 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md text-[10px] font-bold text-amber-800 select-none shadow-2xs"
+                    title="وضع القراءة فقط: مسح الفلاتر والبحث للتمكن من التعديل"
+                  >
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <span>قراءة فقط</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -395,15 +405,23 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
           /* ==========================================
              B. EMPTY PADDING SLOT (Quiet & Unobtrusive)
              ========================================== */
-          <div className="flex flex-col items-center justify-center h-full min-h-[140px] text-center p-3 my-auto">
-            <span className="text-xs font-bold text-slate-400 mb-2 select-none flex items-center gap-1">
+          <div
+            onClick={() => openMaximizeModal(index)}
+            className="flex flex-col items-center justify-center h-full min-h-[140px] text-center p-3 my-auto cursor-pointer group"
+            title="انقر لعرض تفاصيل الخانة الشاغرة"
+          >
+            <span className="text-xs font-bold text-slate-400 mb-2 select-none flex items-center gap-1 group-hover:text-blue-600 transition-colors">
               <Hash className="w-3 h-3" />
-              <span>خانة فارغة للطباعة ({doc.counter || index + 1})</span>
+              <span>خانة فارغة للطباعة ({doc.counter || (index % 21) + 1})</span>
+              <Maximize2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity mr-1" />
             </span>
             {!isReadOnly ? (
               <button
                 type="button"
-                onClick={() => openAddDoctorModal({ pageGvr: doc.pageGvr, pageCity: doc.pageCity, pageRegion: doc.pageRegion })}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openAddDoctorModal({ pageGvr: doc.pageGvr, pageCity: doc.pageCity, pageRegion: doc.pageRegion });
+                }}
                 className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-dashed border-blue-300 text-blue-600 bg-blue-50/60 hover:bg-blue-100 hover:border-blue-400 font-bold text-xs transition-all cursor-pointer shadow-2xs"
                 title="إضافة طبيب في هذه الخانة"
               >
@@ -411,7 +429,7 @@ function DoctorCard({ doc, index, isHighlighted = false }) {
                 <span>إضافة طبيب في هذه الخانة</span>
               </button>
             ) : (
-              <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md select-none">
+              <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md select-none group-hover:border-amber-300 transition-colors">
                 🔒 خانة شاغرة (وضع القراءة فقط)
               </span>
             )}

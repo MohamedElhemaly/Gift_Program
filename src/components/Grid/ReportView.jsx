@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import A4Page from './A4Page';
 import { useDoctorStore } from '../../store/useDoctorStore';
 import {
@@ -16,6 +17,8 @@ import {
   Hash,
   Lock,
   Unlock,
+  Zap,
+  Loader2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -49,23 +52,6 @@ export default function ReportView({ selectedPages = null }) {
   const [jumpDocCodeInput, setJumpDocCodeInput] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(null);
 
-  // Auto-Navigate when a new doctor is added to a newly created page
-  useEffect(() => {
-    if (targetPageJump) {
-      if (pagesPerPage !== 'ALL') {
-        const targetBatch = Math.floor((targetPageJump - 1) / pagesPerPage) + 1;
-        setCurrentPage(targetBatch);
-      }
-      setTimeout(() => {
-        const el = document.getElementById(`page-${targetPageJump}`);
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        setTargetPageJump(null);
-      }, 150);
-    }
-  }, [targetPageJump, pagesPerPage, setTargetPageJump]);
-
   const totalPages = Math.ceil((displayedDoctors?.length || 0) / 21);
 
   // Group doctors into pages
@@ -84,11 +70,76 @@ export default function ReportView({ selectedPages = null }) {
     return p;
   }, [displayedDoctors]);
 
-  if (!displayedDoctors || displayedDoctors.length === 0) {
-    return null;
-  }
+  // SCREEN MODE & VIRTUALIZATION CALCULATION
+  const effectiveTotalPages = allPages.length;
+  const isAllMode = pagesPerPage === 'ALL';
+  const shouldVirtualize = isAllMode || pagesPerPage >= 50;
 
-  // PRINT MODE: If selectedPages is active, render the requested print pages
+  const maxPage = isAllMode ? 1 : Math.ceil(effectiveTotalPages / pagesPerPage);
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), maxPage || 1);
+
+  const visiblePages = useMemo(() => {
+    if (isAllMode) return allPages;
+    return allPages.slice((safeCurrentPage - 1) * pagesPerPage, safeCurrentPage * pagesPerPage);
+  }, [isAllMode, allPages, safeCurrentPage, pagesPerPage]);
+
+  const itemsToVirtualize = visiblePages;
+
+  // DOM Virtualization reference & offset measurement
+  const parentRef = useRef(null);
+  const [parentOffset, setParentOffset] = useState(0);
+
+  useLayoutEffect(() => {
+    const updateOffset = () => {
+      if (parentRef.current) {
+        const rect = parentRef.current.getBoundingClientRect();
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        setParentOffset(Math.round(rect.top + scrollY));
+      }
+    };
+    updateOffset();
+    window.addEventListener('resize', updateOffset);
+    return () => window.removeEventListener('resize', updateOffset);
+  }, [isReadOnly, displayedDoctors?.length, pagesPerPage]);
+
+  // Window Virtualizer for silky smooth 60fps scrolling on low-end hardware
+  const virtualizer = useWindowVirtualizer({
+    count: shouldVirtualize ? itemsToVirtualize.length : 0,
+    estimateSize: () => 1400,
+    overscan: 2,
+    scrollMargin: parentOffset,
+    getItemKey: (index) => itemsToVirtualize[index]?.pageNum ?? index,
+  });
+
+  // Auto-Navigate when a new doctor is added to a newly created page
+  useEffect(() => {
+    if (targetPageJump) {
+      if (isAllMode) {
+        virtualizer.scrollToIndex(targetPageJump - 1, { align: 'start', behavior: 'smooth' });
+      } else if (shouldVirtualize) {
+        const targetBatch = Math.floor((targetPageJump - 1) / pagesPerPage) + 1;
+        if (safeCurrentPage !== targetBatch) {
+          setCurrentPage(targetBatch);
+        }
+        const indexInBatch = (targetPageJump - 1) % pagesPerPage;
+        setTimeout(() => {
+          virtualizer.scrollToIndex(indexInBatch, { align: 'start', behavior: 'smooth' });
+        }, 80);
+      } else {
+        const targetBatch = Math.floor((targetPageJump - 1) / pagesPerPage) + 1;
+        setCurrentPage(targetBatch);
+        setTimeout(() => {
+          const el = document.getElementById(`page-${targetPageJump}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
+      }
+      setTargetPageJump(null);
+    }
+  }, [targetPageJump, isAllMode, shouldVirtualize, pagesPerPage, safeCurrentPage, setTargetPageJump, virtualizer]);
+
+  // PRINT MODE: If selectedPages is active, render the requested print pages (Pure Static HTML - Unvirtualized)
   if (selectedPages !== null && selectedPages.length > 0) {
     return (
       <div id="reportContainer" className="my-6">
@@ -107,29 +158,36 @@ export default function ReportView({ selectedPages = null }) {
     );
   }
 
-  // SCREEN MODE: Paginate to keep the browser silky smooth
-  const effectiveTotalPages = allPages.length;
-  const maxPage = pagesPerPage === 'ALL' ? 1 : Math.ceil(effectiveTotalPages / pagesPerPage);
-  const safeCurrentPage = Math.min(Math.max(currentPage, 1), maxPage || 1);
-
-  const visiblePages = pagesPerPage === 'ALL'
-    ? allPages
-    : allPages.slice((safeCurrentPage - 1) * pagesPerPage, safeCurrentPage * pagesPerPage);
+  if (!displayedDoctors || displayedDoctors.length === 0) {
+    return null;
+  }
 
   const handleJump = (e) => {
     e.preventDefault();
     const target = parseInt(jumpInput, 10);
     if (!isNaN(target) && target >= 1 && target <= totalPages) {
-      if (pagesPerPage !== 'ALL') {
+      if (isAllMode) {
+        virtualizer.scrollToIndex(target - 1, { align: 'start', behavior: 'smooth' });
+      } else if (shouldVirtualize) {
+        const targetBatch = Math.floor((target - 1) / pagesPerPage) + 1;
+        if (safeCurrentPage !== targetBatch) {
+          setCurrentPage(targetBatch);
+        }
+        const indexInBatch = (target - 1) % pagesPerPage;
+        setTimeout(() => {
+          virtualizer.scrollToIndex(indexInBatch, { align: 'start', behavior: 'smooth' });
+        }, 80);
+      } else {
         const newBatch = Math.floor((target - 1) / pagesPerPage) + 1;
-        setCurrentPage(newBatch);
+        if (safeCurrentPage !== newBatch) {
+          setCurrentPage(newBatch);
+        }
+        setTimeout(() => {
+          const el = document.getElementById(`page-${target}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
       }
       setJumpInput('');
-      // Smooth scroll to page element
-      setTimeout(() => {
-        const el = document.getElementById(`page-${target}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
     } else {
       toast.error(`رقم الصفحة غير صالح. النطاق المتاح: من 1 إلى ${totalPages}`);
     }
@@ -184,28 +242,39 @@ export default function ReportView({ selectedPages = null }) {
     const foundDoc = displayedDoctors[doctorIndex];
     const targetPage = Math.floor(doctorIndex / 21) + 1;
 
-    // A. Switch batch if pagination is active
-    if (pagesPerPage !== 'ALL') {
-      const targetBatch = Math.floor((targetPage - 1) / pagesPerPage) + 1;
-      if (safeCurrentPage !== targetBatch) {
-        setCurrentPage(targetBatch);
-      }
-    }
-
-    // B. Set React highlight state
+    // React highlight state
     setHighlightedIndex(doctorIndex);
 
-    // C. User feedback toast
+    // User feedback toast
     const docNameLabel = foundDoc.name ? ` (${foundDoc.name})` : '';
     toast.success(`تم الانتقال للطبيب${docNameLabel} في صفحة ${targetPage}`, {
       icon: '🎯',
       duration: 3500,
     });
 
-    // D. Clear input
+    // Clear input
     setJumpDocCodeInput('');
 
-    // E. Smooth scroll & trigger highlight animation with DOM retry
+    // Scroll to page
+    if (isAllMode) {
+      virtualizer.scrollToIndex(targetPage - 1, { align: 'start', behavior: 'smooth' });
+    } else if (shouldVirtualize) {
+      const targetBatch = Math.floor((targetPage - 1) / pagesPerPage) + 1;
+      if (safeCurrentPage !== targetBatch) {
+        setCurrentPage(targetBatch);
+      }
+      const indexInBatch = (targetPage - 1) % pagesPerPage;
+      setTimeout(() => {
+        virtualizer.scrollToIndex(indexInBatch, { align: 'start', behavior: 'smooth' });
+      }, 80);
+    } else {
+      const targetBatch = Math.floor((targetPage - 1) / pagesPerPage) + 1;
+      if (safeCurrentPage !== targetBatch) {
+        setCurrentPage(targetBatch);
+      }
+    }
+
+    // Smooth scroll & trigger highlight animation with DOM retry
     const attemptScrollAndHighlight = (retryCount = 0) => {
       const cardEl = document.getElementById(`item-${doctorIndex}`);
       if (cardEl) {
@@ -215,8 +284,8 @@ export default function ReportView({ selectedPages = null }) {
           cardEl.classList.remove('jump-highlight');
           setHighlightedIndex(null);
         }, 3000);
-      } else if (retryCount < 5) {
-        setTimeout(() => attemptScrollAndHighlight(retryCount + 1), 100);
+      } else if (retryCount < 10) {
+        setTimeout(() => attemptScrollAndHighlight(retryCount + 1), 120);
       } else {
         const pageEl = document.getElementById(`page-${targetPage}`);
         if (pageEl) {
@@ -226,7 +295,7 @@ export default function ReportView({ selectedPages = null }) {
       }
     };
 
-    setTimeout(() => attemptScrollAndHighlight(0), 100);
+    setTimeout(() => attemptScrollAndHighlight(0), 120);
   };
 
   return (
@@ -338,15 +407,31 @@ export default function ReportView({ selectedPages = null }) {
                   const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
                   setPagesPerPage(val);
                   setCurrentPage(1);
+                  if (val === 'ALL' || val >= 50) {
+                    toast.success('تم تفعيل التمرير الافتراضي الخفيف (DOM Virtualization) - حماية كاملة من التجمد', {
+                      icon: '⚡',
+                      duration: 3000,
+                    });
+                  }
                 }}
                 className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none"
               >
                 <option value={5}>5 صفحات</option>
                 <option value={10}>10 صفحات</option>
                 <option value={20}>20 صفحة</option>
-                <option value={50}>50 صفحة</option>
-                <option value="ALL">عرض الكل</option>
+                <option value={50}>50 صفحة (Virtual)</option>
+                <option value="ALL">عرض الكل (Virtual ⚡)</option>
               </select>
+
+              {shouldVirtualize && (
+                <span
+                  className="hidden md:inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full select-none"
+                  title="تقنية DOM Virtualization نشطة لحماية الذاكرة وضمان سرعة 60fps فائقة للأجهزة الضعيفة"
+                >
+                  <Zap className="w-3 h-3 text-amber-500 fill-amber-500" />
+                  <span>عرض افتراضي خفيف</span>
+                </span>
+              )}
             </div>
 
             {/* Prev / Next buttons */}
@@ -479,25 +564,79 @@ export default function ReportView({ selectedPages = null }) {
         </div>
       )}
 
-      {/* Rendered A4 Pages */}
+      {/* Rendered A4 Pages: DOM Virtualization OR Standard Static Mode */}
       {visiblePages.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-300 rounded-xl p-12 text-center text-gray-500">
           لم يتم العثور على أطباء مطابقين لشروط الفلترة المحددة.
         </div>
+      ) : shouldVirtualize ? (
+        <div
+          ref={parentRef}
+          className="virtualized-page-list relative w-full"
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const page = itemsToVirtualize[virtualRow.index];
+            if (!page) return null;
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start - (virtualizer.options.scrollMargin || 0)}px)`,
+                  display: 'flow-root',
+                }}
+              >
+                <A4Page
+                  pageDocs={page.pageDocs}
+                  pageNum={page.pageNum}
+                  startIndex={page.startIndex}
+                  isVisible={true}
+                  highlightedIndex={highlightedIndex}
+                />
+              </div>
+            );
+          })}
+        </div>
       ) : (
-        visiblePages.map((p) => (
-          <A4Page
-            key={`page-${p.pageNum}`}
-            pageDocs={p.pageDocs}
-            pageNum={p.pageNum}
-            startIndex={p.startIndex}
-            isVisible={true}
-            highlightedIndex={highlightedIndex}
-          />
-        ))
+        <div ref={parentRef} className="standard-page-list">
+          {visiblePages.map((p) => (
+            <A4Page
+              key={`page-${p.pageNum}`}
+              pageDocs={p.pageDocs}
+              pageNum={p.pageNum}
+              startIndex={p.startIndex}
+              isVisible={true}
+              highlightedIndex={highlightedIndex}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Bottom Pagination Bar when pages are long */}
+      {/* Lightweight non-blocking floating indicator during rapid scrolling */}
+      {shouldVirtualize && virtualizer.isScrolling && (
+        <div className="no-print fixed bottom-6 left-6 z-50 bg-slate-900/90 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-lg backdrop-blur-md flex items-center gap-2 pointer-events-none transition-all">
+          <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+          <span>جاري عرض الصفحات بسلاسة...</span>
+        </div>
+      )}
+
+      {/* Completion Banner when viewing ALL pages */}
+      {isAllMode && effectiveTotalPages > 0 && (
+        <div className="no-print text-center my-8 text-xs font-bold text-gray-400 flex items-center justify-center gap-2">
+          <span>✨ تم استعراض كامل التقرير ({effectiveTotalPages} صفحة / {displayedDoctors.length} خانة طبيب)</span>
+        </div>
+      )}
+
+      {/* Bottom Pagination Bar when pages are long and not in ALL mode */}
       {pagesPerPage !== 'ALL' && maxPage > 1 && (
         <div className="no-print flex items-center justify-center gap-3 my-8">
           <button

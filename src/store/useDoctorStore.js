@@ -517,6 +517,46 @@ export const useDoctorStore = create((set, get) => ({
     get().rebuildData(docs);
   },
 
+  /**
+   * Hard Reset / Force Sync: Completely overwrite state with clean fresh Excel docs,
+   * purging all manual flags, moved status, inactive status, and experimental additions.
+   */
+  hardResetDoctors: (freshDocs) => {
+    const cleanList = (freshDocs || []).map((d) => ({
+      ...d,
+      isNew: false,
+      is_new: false,
+      isModified: false,
+      is_modified: false,
+      name_modified: false,
+      doc_code_modified: false,
+      specialty_modified: false,
+      address_modified: false,
+      mobile_modified: false,
+      home_tel_modified: false,
+      old_stats_modified: false,
+      new_stats_modified: false,
+      counter_modified: false,
+      pageGvr_modified: false,
+      pageCity_modified: false,
+      pageRegion_modified: false,
+      is_moved: false,
+      moved_from: '',
+      is_inactive: false,
+      merged_codes: [],
+      is_blank_placeholder: false,
+    }));
+
+    set({
+      rawDoctors: cleanList,
+      newlyAddedDoctorId: null,
+      targetPageJump: 1,
+    });
+    get().resetFilters();
+    get().rebuildData(cleanList);
+    get().setStatus('تمت إعادة ضبط البيانات بالكامل وتحديثها مطابقة لملف الإكسيل بنجاح.');
+  },
+
   setLocations: (locs) => set({ locations: locs }),
 
   /**

@@ -9,6 +9,9 @@ import {
   AlertCircle,
   Database,
   Layers,
+  RotateCcw,
+  AlertTriangle,
+  ShieldAlert,
 } from 'lucide-react';
 import ProgressBar from './ProgressBar';
 import { parseAndMergeSheets, parseStatsOnly } from '../../lib/excelParser';
@@ -19,11 +22,15 @@ import { QUERY_KEYS } from '../../hooks/useDoctorQueries';
 import toast from 'react-hot-toast';
 
 export default function ExcelUploadZone({ onClose }) {
-  const { rebuildData } = useDoctorStore();
+  const { rebuildData, hardResetDoctors } = useDoctorStore();
 
   const [docsFile, setDocsFile] = useState(null);
   const [oldFile, setOldFile] = useState(null);
   const [newFile, setNewFile] = useState(null);
+
+  // Hard Reset Mode & Confirmation Modal States
+  const [isHardReset, setIsHardReset] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Upload & Progress States (Smooth persistent bar - NO flickering toasts)
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,8 +90,10 @@ export default function ExcelUploadZone({ onClose }) {
     },
   });
 
-  // Main Upload and Smart Upsert Handler
-  const handleStartUpload = async () => {
+  // Main Upload and Upsert Handler (Supports Smart Upsert and Hard Reset)
+  const handleStartUpload = async (forceHardReset = null) => {
+    const runHardReset = forceHardReset !== null ? forceHardReset : isHardReset;
+
     if (activeTab === 'full') {
       if (!docsFile && !oldFile && !newFile) {
         toast.error('برجاء إفلات أو اختيار ملف إكسيل واحد على الأقل (.xlsx / .xls)!');
@@ -94,8 +103,16 @@ export default function ExcelUploadZone({ onClose }) {
       setIsProcessing(true);
       setUploadError(null);
       setProgressPercent(10);
-      setProgressStatus('جاري تشغيل المعالجة بالخلفية وتطهير البيانات من الرموز العشوائية (Web Worker)...');
-      setProgressSubText('Sanitizing special symbols (%%%, ***) and decoding sheets...');
+      setProgressStatus(
+        runHardReset
+          ? 'جاري تشغيل المعالجة بالخلفية وتطهير البيانات وإعادة الضبط الصارم (Hard Reset)...'
+          : 'جاري تشغيل المعالجة بالخلفية وتطهير البيانات من الرموز العشوائية (Web Worker)...'
+      );
+      setProgressSubText(
+        runHardReset
+          ? 'Bypassing Smart Upsert, preparing fresh overwrite, and sanitizing records...'
+          : 'Sanitizing special symbols (%%%, ***) and decoding sheets...'
+      );
 
       try {
         // 1. Web Worker parses and sanitizes all strings
@@ -114,35 +131,67 @@ export default function ExcelUploadZone({ onClose }) {
         }
 
         setProgressPercent(40);
-        setProgressStatus(`تم تطهير واستخراج ${mergedList.length} طبيب بنجاح! جاري التحديث الفوري على الشاشة...`);
+        setProgressStatus(
+          runHardReset
+            ? `تم تطهير ${mergedList.length} طبيب! جاري تصفير التعديلات وتطبيق الضبط الصارم فورياً...`
+            : `تم تطهير واستخراج ${mergedList.length} طبيب بنجاح! جاري التحديث الفوري على الشاشة...`
+        );
         setProgressSubText(`Doctors parsed: ${mergedList.length}`);
 
         // 2. Render instantly in Zustand store
-        rebuildData(mergedList);
+        if (runHardReset) {
+          hardResetDoctors(mergedList);
+        } else {
+          rebuildData(mergedList);
+        }
         queryClient.setQueryData(QUERY_KEYS.DOCTORS, mergedList);
 
         setProgressPercent(50);
-        setProgressStatus(`جاري المزامنة مع قاعدة البيانات السحابية (Smart Upsert)...`);
-        setProgressSubText(`Preserving manual edits & upserting to Supabase...`);
+        setProgressStatus(
+          runHardReset
+            ? `جاري الكتابة الإجبارية في قاعدة البيانات ومسح السجلات التجريبية (Force Overwrite)...`
+            : `جاري المزامنة مع قاعدة البيانات السحابية (Smart Upsert)...`
+        );
+        setProgressSubText(
+          runHardReset
+            ? 'Overwriting database, resetting flags, and purging extraneous mock doctors...'
+            : 'Preserving manual edits & upserting to Supabase...'
+        );
 
-        // 3. Smart Batch Upsert in Supabase with exact 0-100% calculation
-        await doctorService.upsertDoctorsBatch(mergedList, (statusMsg, current, total) => {
-          if (total && total > 0) {
-            const calcPercent = 50 + Math.round((current / total) * 48);
-            setProgressPercent(calcPercent);
-            setProgressStatus(statusMsg || `جاري حفظ السجلات (${current} من ${total})...`);
-            setProgressSubText(`${current} / ${total} records processed`);
-          } else {
-            setProgressStatus(statusMsg);
-          }
-        });
+        // 3. Batch Upsert / Hard Reset in Supabase with exact 0-100% calculation
+        await doctorService.upsertDoctorsBatch(
+          mergedList,
+          (statusMsg, current, total) => {
+            if (total && total > 0) {
+              const calcPercent = 50 + Math.round((current / total) * 48);
+              setProgressPercent(calcPercent);
+              setProgressStatus(statusMsg || `جاري حفظ السجلات (${current} من ${total})...`);
+              setProgressSubText(`${current} / ${total} records processed`);
+            } else {
+              setProgressStatus(statusMsg);
+            }
+          },
+          { hardReset: runHardReset }
+        );
 
         setProgressPercent(100);
-        setProgressStatus(`اكتملت المزامنة بنجاح! تم حفظ وتحديث ${mergedList.length} طبيب في قاعدة البيانات.`);
-        setProgressSubText('Database sync completed successfully.');
+        setProgressStatus(
+          runHardReset
+            ? `اكتملت إعادة الضبط الصارم بنجاح! تم مسح التعديلات اليدوية السابقة ومطابقة ${mergedList.length} طبيب مع الإكسيل بدقة 100%.`
+            : `اكتملت المزامنة بنجاح! تم حفظ وتحديث ${mergedList.length} طبيب في قاعدة البيانات.`
+        );
+        setProgressSubText(
+          runHardReset ? 'Hard reset and database overwrite completed.' : 'Database sync completed successfully.'
+        );
 
         // Invalidate queries to ensure all tabs have fresh data
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCTORS });
+
+        toast.success(
+          runHardReset
+            ? 'تمت إعادة ضبط البيانات بالكامل ومطابقتها مع الإكسيل!'
+            : 'تم الاستيراد والمزامنة بنجاح!'
+        );
 
         // Automatically reset files after short pause
         setTimeout(() => {
@@ -150,6 +199,7 @@ export default function ExcelUploadZone({ onClose }) {
           setDocsFile(null);
           setOldFile(null);
           setNewFile(null);
+          setIsHardReset(false);
           if (onClose) onClose();
         }, 1500);
 
@@ -403,6 +453,52 @@ export default function ExcelUploadZone({ onClose }) {
 
       </div>
 
+      {/* Hard Reset Mode Option Card (Only in Full Import Mode) */}
+      {activeTab === 'full' && (
+        <div
+          className={`p-3.5 rounded-xl border transition-all ${
+            isHardReset
+              ? 'bg-rose-50/90 border-rose-300 text-rose-950 shadow-xs ring-1 ring-rose-200'
+              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <label className="flex items-start sm:items-center justify-between gap-3 cursor-pointer select-none">
+            <div className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={isHardReset}
+                onChange={(e) => setIsHardReset(e.target.checked)}
+                className="mt-0.5 sm:mt-0 w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500 cursor-pointer"
+              />
+              <div>
+                <div className="font-bold text-xs flex items-center gap-1.5 text-slate-900">
+                  <RotateCcw className={`w-3.5 h-3.5 ${isHardReset ? 'text-rose-600' : 'text-slate-500'}`} />
+                  <span>رفع وإعادة ضبط البيانات (Hard Reset / Force Sync)</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  {isHardReset
+                    ? '⚠️ سيتم مسح أي تعديلات يدوية سابقة وإعادة البيانات تماماً كما هي في ملف الإكسيل.'
+                    : 'تجاوز المزامنة الذكية ومسح أي تعديلات يدوية سابقة لإعادة التطبيق إلى حالة الإكسيل الأصلية تماماً.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-shrink-0">
+              <span
+                className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                  isHardReset
+                    ? 'bg-rose-100 text-rose-800 border-rose-300'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
+                title="سيتم مسح أي تعديلات يدوية سابقة وإعادة البيانات تماماً كما هي في ملف الإكسيل"
+              >
+                {isHardReset ? '⚡ وضع إعادة الضبط نشط' : 'الافتراضي: حماية التعديلات'}
+              </span>
+            </div>
+          </label>
+        </div>
+      )}
+
       {/* Progress Bar (Visible during processing) */}
       {isProcessing && (
         <ProgressBar
@@ -414,22 +510,135 @@ export default function ExcelUploadZone({ onClose }) {
       )}
 
       {/* Action Footer */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
         <div className="text-xs text-slate-500 flex items-center gap-2">
-          <Database className="w-4 h-4 text-blue-600" />
-          <span>المزامنة الذكية تحمي تلقائياً أي طبيب تم نقله أو تعديله يدوياً من المسح.</span>
+          <Database className={`w-4 h-4 flex-shrink-0 ${isHardReset ? 'text-rose-600' : 'text-blue-600'}`} />
+          <span className="leading-snug">
+            {isHardReset
+              ? '⚠️ وضع إعادة الضبط الصارم مفعل: سيتم مسح أي تعديلات يدوية واستبدال البيانات كلياً.'
+              : 'المزامنة الذكية تحمي تلقائياً أي طبيب تم نقله أو تعديله يدوياً من المسح.'}
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={handleStartUpload}
-          disabled={isProcessing || (!docsFile && !oldFile && !newFile)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>{isProcessing ? 'جاري المعالجة والمزامنة...' : 'بدء الاستيراد والمزامنة السحابية'}</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
+          {/* Distinct Secondary Hard Reset Button (Only in Full Mode) */}
+          {activeTab === 'full' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!docsFile && !oldFile && !newFile) {
+                  toast.error('برجاء إفلات أو اختيار ملف إكسيل أولاً!');
+                  return;
+                }
+                setShowConfirmModal(true);
+              }}
+              disabled={isProcessing || (!docsFile && !oldFile && !newFile)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold text-xs shadow-2xs transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+              title="سيتم مسح أي تعديلات يدوية سابقة وإعادة البيانات تماماً كما هي في ملف الإكسيل"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+              <span>رفع وإعادة ضبط البيانات (Hard Reset)</span>
+            </button>
+          )}
+
+          {/* Standard Primary Upload Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (isHardReset) {
+                if (!docsFile && !oldFile && !newFile) {
+                  toast.error('برجاء إفلات أو اختيار ملف إكسيل أولاً!');
+                  return;
+                }
+                setShowConfirmModal(true);
+              } else {
+                handleStartUpload(false);
+              }
+            }}
+            disabled={isProcessing || (!docsFile && !oldFile && !newFile)}
+            className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer ${
+              isHardReset
+                ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200'
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+            }`}
+            title={
+              isHardReset
+                ? 'سيتم مسح أي تعديلات يدوية سابقة وإعادة البيانات تماماً كما هي في ملف الإكسيل'
+                : 'بدء الاستيراد الذكي مع حماية التعديلات اليدوية'
+            }
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>
+              {isProcessing
+                ? 'جاري المعالجة والمزامنة...'
+                : isHardReset
+                ? 'بدء الرفع وإعادة الضبط (Hard Reset)'
+                : 'بدء الاستيراد الذكي (Smart Upsert)'}
+            </span>
+          </button>
+        </div>
       </div>
+
+      {/* Secondary Confirmation Modal for Hard Reset */}
+      {showConfirmModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setShowConfirmModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 text-right shadow-2xl border border-rose-200 space-y-4"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center flex-shrink-0 shadow-xs">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">
+                  تأكيد إعادة ضبط البيانات (Hard Reset)
+                </h3>
+                <p className="text-xs text-rose-600 font-bold mt-0.5">
+                  تحذير: سيتم مسح أي تعديلات يدوية سابقة وإعادة البيانات تماماً كما هي في ملف الإكسيل
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-rose-50/80 border border-rose-200 rounded-xl p-3.5 text-xs text-slate-700 space-y-2 leading-relaxed">
+              <p className="font-bold text-rose-950">
+                عند تأكيد هذا الإجراء سيتم تنفيذ ما يلي فوراً:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-700 text-[11px] pr-1">
+                <li><b className="text-rose-900">مسح كافة التعديلات اليدوية:</b> إعادة الأسماء والتخصصات والعناوين والهواتف لحالتها الأصلية.</li>
+                <li><b className="text-rose-900">إلغاء عمليات النقل والدمج:</b> استعادة أماكن الأطباء الأصلية وإلغاء حالات الإيقاف (Inactive).</li>
+                <li><b className="text-rose-900">مسح البيانات التجريبية:</b> حذف أي أطباء أو خانات تمت إضافتها يدوياً ولا توجد في الشيت.</li>
+                <li><b className="text-rose-900">تحديث كامل للشبكة:</b> إعادة بناء الصفحات وطباعة التقرير مطابقة 100% لملف الإكسيل المرفوع.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                إلغاء وتراجع
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleStartUpload(true);
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>نعم، استمر مع إعادة الضبط (Force Sync)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -228,16 +228,47 @@ export const doctorService = {
   },
 
   /**
-   * Batch upsert doctors, locations, and statistics from Excel import
+   * Batch upsert doctors, locations, and statistics from Excel import.
+   * Supports options.hardReset to bypass Smart Upsert, force overwrite, and purge extraneous mock doctors.
    */
-  async upsertDoctorsBatch(doctorsList, onProgress = null) {
+  async upsertDoctorsBatch(doctorsList, onProgress = null, options = {}) {
+    const isHardReset = Boolean(options?.hardReset);
+
     if (!isSupabaseConfigured || !supabase) {
       safeSaveLocalStorage(LOCAL_STORAGE_KEY, doctorsList);
-      await this.logAudit('IMPORT_EXCEL', `تم استيراد ${doctorsList.length} طبيب محلياً (وضع عدم الاتصال).`);
+      await this.logAudit(
+        isHardReset ? 'HARD_RESET' : 'IMPORT_EXCEL',
+        isHardReset
+          ? `تمت إعادة ضبط البيانات بالكامل من ملف الإكسيل محلياً (${doctorsList.length} طبيب).`
+          : `تم استيراد ${doctorsList.length} طبيب محلياً (وضع عدم الاتصال).`
+      );
       return { success: true, count: doctorsList.length };
     }
 
     try {
+      // 0. If Hard Reset: Purge extraneous / mock doctors that do NOT exist in the Excel sheet
+      if (isHardReset) {
+        if (onProgress) onProgress('جاري فحص ومسح السجلات التجريبية الزائدة من قاعدة البيانات (Hard Reset)...');
+        const excelCodes = new Set(doctorsList.map((d) => String(d.doc_code).trim()).filter(Boolean));
+        
+        try {
+          const { data: allExisting } = await supabase.from('doctors').select('id, doc_code');
+          if (allExisting && allExisting.length > 0) {
+            const extraneous = allExisting.filter((d) => !excelCodes.has(String(d.doc_code).trim()));
+            if (extraneous.length > 0) {
+              const extraIds = extraneous.map((d) => d.id);
+              for (let i = 0; i < extraIds.length; i += 200) {
+                const chunkIds = extraIds.slice(i, i + 200);
+                await supabase.from('statistics').delete().in('doctor_id', chunkIds);
+                await supabase.from('doctors').delete().in('id', chunkIds);
+              }
+            }
+          }
+        } catch (purgeErr) {
+          console.warn('Purge extraneous doctors warning:', purgeErr.message);
+        }
+      }
+
       // 1. Gather and normalize unique locations
       const locationMap = new Map();
       doctorsList.forEach((d) => {
@@ -285,28 +316,30 @@ export const doctorService = {
           onProgress(`جاري حفظ وتحديث بيانات الأطباء (${currentCount} من ${doctorsList.length})...`, currentCount, doctorsList.length);
         }
 
-        // Query existing doctors in this chunk to preserve manual location/moves/merges/edits
+        // Query existing doctors in this chunk to preserve manual location/moves/merges/edits (only when NOT hardReset)
         const chunkCodes = chunk.map((d) => String(d.doc_code).trim());
         let existingMap = new Map();
-        try {
-          const { data: existingRecords } = await supabase
-            .from('doctors')
-            .select('doc_code, name, specialty, address, mobile, home_tel, location_id, is_moved, moved_from, merged_codes, is_inactive, has_manual_edits')
-            .in('doc_code', chunkCodes);
-          if (existingRecords) {
-            existingRecords.forEach((r) => existingMap.set(r.doc_code, r));
+        if (!isHardReset) {
+          try {
+            const { data: existingRecords } = await supabase
+              .from('doctors')
+              .select('doc_code, name, specialty, address, mobile, home_tel, location_id, is_moved, moved_from, merged_codes, is_inactive, has_manual_edits')
+              .in('doc_code', chunkCodes);
+            if (existingRecords) {
+              existingRecords.forEach((r) => existingMap.set(r.doc_code, r));
+            }
+          } catch (exErr) {
+            console.warn('Could not check existing doctors:', exErr);
           }
-        } catch (exErr) {
-          console.warn('Could not check existing doctors:', exErr);
         }
 
         const buildRecords = (withExtended) => chunk.map((d) => {
           const code = String(d.doc_code).trim();
-          const existing = existingMap.get(code);
+          const existing = isHardReset ? null : existingMap.get(code);
           const key = `${(d.pageGvr || '').trim()}:::${(d.pageCity || '').trim()}:::${(d.pageRegion || '').trim()}`;
           
-          // If doctor already exists and has manual edits or was moved, STRICTLY PRESERVE all manual changes!
-          const hasManual = existing && (Boolean(existing.has_manual_edits) || Boolean(existing.is_moved));
+          // If Hard Reset: strictly DO NOT preserve manual edits or moves!
+          const hasManual = !isHardReset && existing && (Boolean(existing.has_manual_edits) || Boolean(existing.is_moved));
 
           const finalLocationId = (hasManual && existing.location_id) 
             ? existing.location_id 
@@ -325,14 +358,14 @@ export const doctorService = {
             address: hasManual ? cleanGeneralText(existing.address) : (inAddr || (existing ? cleanGeneralText(existing.address) : '')),
             mobile: hasManual ? cleanGeneralText(existing.mobile) : (inMob || (existing ? cleanGeneralText(existing.mobile) : '')),
             home_tel: hasManual ? cleanGeneralText(existing.home_tel) : (inHome || (existing ? cleanGeneralText(existing.home_tel) : '')),
-            is_inactive: existing ? Boolean(existing.is_inactive) : Boolean(d.is_inactive),
+            is_inactive: hasManual ? Boolean(existing.is_inactive) : false,
             location_id: finalLocationId || (existing?.location_id || null),
           };
           if (withExtended) {
-            rec.is_moved = existing ? Boolean(existing.is_moved) : Boolean(d.is_moved);
-            rec.moved_from = existing ? (existing.moved_from || '') : (d.moved_from || '');
-            rec.merged_codes = existing?.merged_codes?.length ? existing.merged_codes : (d.merged_codes || []);
-            rec.has_manual_edits = existing ? Boolean(existing.has_manual_edits) : false;
+            rec.is_moved = hasManual ? Boolean(existing.is_moved) : false;
+            rec.moved_from = hasManual ? (existing.moved_from || '') : '';
+            rec.merged_codes = hasManual && existing?.merged_codes?.length ? existing.merged_codes : [];
+            rec.has_manual_edits = hasManual ? Boolean(existing.has_manual_edits) : false;
           }
           return rec;
         });
@@ -393,8 +426,10 @@ export const doctorService = {
       safeSaveLocalStorage(LOCAL_STORAGE_KEY, doctorsList);
 
       await this.logAudit(
-        'IMPORT_EXCEL',
-        `تم استيراد وتحديث ${doctorsList.length} طبيب عبر شيتات الإكسيل.`
+        isHardReset ? 'HARD_RESET' : 'IMPORT_EXCEL',
+        isHardReset
+          ? `تمت إعادة ضبط البيانات بالكامل ومسح كافة التعديلات اليدوية (${doctorsList.length} طبيب).`
+          : `تم استيراد وتحديث ${doctorsList.length} طبيب عبر شيتات الإكسيل.`
       );
 
       return { success: true, count: doctorsList.length };
